@@ -1,0 +1,497 @@
+{
+  "meta": {
+    "source": "Car Wars Compendium (Steve Jackson Games)",
+    "version": "2nd Edition, 7th Printing",
+    "generated": "2024-12-24",
+    "notes": "Extracted from PDF text conversion. Prices in 2040s dollars."
+  },
+  "scale": {
+    "_description": "Car Wars uses 1:180 scale. 1 tabletop inch = 15 real feet.",
+    "tabletop": {
+      "inchToFeet": 15,
+      "carCounterLength": 1.0,
+      "carCounterWidth": 0.5,
+      "cycleCounterLength": 0.5,
+      "gridMajor": 1.0,
+      "gridMinor": 0.25
+    },
+    "gameUnits": {
+      "_note": "1 game unit = 1 Car Wars inch = 15 feet",
+      "unitsPerInch": 1.0,
+      "feetPerUnit": 15,
+      "carLength": 1.0,
+      "carWidth": 0.5,
+      "gridCell": 1.0
+    },
+    "visualScale": {
+      "_note": "For 3D rendering, cars are scaled up for visibility. Does not affect game logic.",
+      "multiplier": 4.5,
+      "renderedCarLength": 4.5,
+      "renderedCarWidth": 2.25
+    },
+    "speedConversion": {
+      "_note": "10 mph = 1 inch/turn. At 50 mph, move 5 inches/turn = 1 inch/phase.",
+      "mphToUnitsPerTurn": 0.1,
+      "unitsPerTurnToMph": 10,
+      "phasesPerTurn": 5
+    }
+  },
+  "vehicles": {
+    "cars": {
+      "subcompact": { "price": 300, "weight": 1000, "maxLoad": 2300, "spaces": 7, "armorCostPerPoint": 11, "armorWeightPerPoint": 5 },
+      "compact": { "price": 400, "weight": 1300, "maxLoad": 3700, "spaces": 10, "armorCostPerPoint": 13, "armorWeightPerPoint": 6 },
+      "midsize": { "price": 600, "weight": 1600, "maxLoad": 4800, "spaces": 13, "armorCostPerPoint": 16, "armorWeightPerPoint": 8 },
+      "sedan": { "price": 700, "weight": 1700, "maxLoad": 5100, "spaces": 16, "armorCostPerPoint": 18, "armorWeightPerPoint": 9 },
+      "luxury": { "price": 800, "weight": 1800, "maxLoad": 5500, "spaces": 19, "armorCostPerPoint": 20, "armorWeightPerPoint": 10 },
+      "stationWagon": { "price": 800, "weight": 1800, "maxLoad": 5500, "spaces": 14, "cargoSpaces": 7, "armorCostPerPoint": 20, "armorWeightPerPoint": 10 },
+      "pickup": { "price": 900, "weight": 2100, "maxLoad": 6500, "spaces": 13, "cargoSpaces": 11, "armorCostPerPoint": 22, "armorWeightPerPoint": 11 },
+      "camper": { "price": 1400, "weight": 2300, "maxLoad": 6500, "spaces": 17, "cargoSpaces": 7, "armorCostPerPoint": 30, "armorWeightPerPoint": 14 },
+      "van": { "price": 1000, "weight": 2000, "maxLoad": 6000, "spaces": 24, "cargoSpaces": 6, "armorCostPerPoint": 30, "armorWeightPerPoint": 14 }
+    }
+  },
+  "chassis": {
+    "light": { "weightModifier": -0.10, "priceModifier": 0.20 },
+    "standard": { "weightModifier": 0, "priceModifier": 0 },
+    "heavy": { "weightModifier": 0.10, "priceModifier": 0.50 },
+    "extraHeavy": { "weightModifier": 0.20, "priceModifier": 1.00 }
+  },
+  "suspension": {
+    "light": { "priceMultiplier": 0, "hc": 1, "vanHc": 0, "subcompactHc": 2 },
+    "improved": { "priceMultiplier": 1.00, "hc": 2, "vanHc": 1, "subcompactHc": 3 },
+    "heavy": { "priceMultiplier": 1.50, "hc": 3, "vanHc": 2, "subcompactHc": 4 },
+    "offRoad": { "priceMultiplier": 5.00, "hc": 2, "vanHc": 1, "subcompactHc": 3, "note": "Negates off-road HC penalty" }
+  },
+  "powerPlants": {
+    "electric": {
+      "small": { "cost": 500, "weight": 500, "spaces": 3, "dp": 5, "powerFactors": 800 },
+      "medium": { "cost": 1000, "weight": 700, "spaces": 4, "dp": 8, "powerFactors": 1400 },
+      "large": { "cost": 2000, "weight": 900, "spaces": 5, "dp": 10, "powerFactors": 2000 },
+      "super": { "cost": 3000, "weight": 1100, "spaces": 6, "dp": 12, "powerFactors": 2600 },
+      "sport": { "cost": 6000, "weight": 1000, "spaces": 6, "dp": 12, "powerFactors": 3000 },
+      "thundercat": { "cost": 12000, "weight": 2000, "spaces": 8, "dp": 15, "powerFactors": 6700 }
+    },
+    "gas": {
+      "10cid": { "cost": 400, "weight": 60, "spaces": 1, "dp": 1, "power": 300, "baseMpg": 80 },
+      "30cid": { "cost": 750, "weight": 115, "spaces": 1, "dp": 2, "power": 500, "baseMpg": 70 },
+      "50cid": { "cost": 1250, "weight": 150, "spaces": 1, "dp": 3, "power": 700, "baseMpg": 60 },
+      "100cid": { "cost": 2500, "weight": 265, "spaces": 2, "dp": 6, "power": 1300, "baseMpg": 50 },
+      "150cid": { "cost": 4000, "weight": 375, "spaces": 3, "dp": 9, "power": 1900, "baseMpg": 45 },
+      "200cid": { "cost": 5500, "weight": 480, "spaces": 4, "dp": 12, "power": 2500, "baseMpg": 35 },
+      "250cid": { "cost": 6500, "weight": 715, "spaces": 5, "dp": 14, "power": 3200, "baseMpg": 28 },
+      "300cid": { "cost": 7800, "weight": 825, "spaces": 6, "dp": 16, "power": 4000, "baseMpg": 22 },
+      "350cid": { "cost": 9500, "weight": 975, "spaces": 7, "dp": 19, "power": 5000, "baseMpg": 18 },
+      "400cid": { "cost": 10500, "weight": 1050, "spaces": 8, "dp": 22, "power": 6300, "baseMpg": 15 },
+      "450cid": { "cost": 11700, "weight": 1125, "spaces": 9, "dp": 24, "power": 7800, "baseMpg": 13 },
+      "500cid": { "cost": 13000, "weight": 1200, "spaces": 10, "dp": 26, "power": 9500, "baseMpg": 12 },
+      "700cid": { "cost": 19000, "weight": 1275, "spaces": 14, "dp": 30, "power": 13000, "baseMpg": 10 }
+    }
+  },
+  "gasTanks": {
+    "economy": { "dp": 2, "weightPerGallon": 1, "costPerGallon": 2 },
+    "heavyDuty": { "dp": 4, "weightPerGallon": 2, "costPerGallon": 5 },
+    "racing": { "dp": 4, "weightPerGallon": 5, "costPerGallon": 10, "leakReduction": 0.25 },
+    "duelling": { "dp": 8, "weightPerGallon": 10, "costPerGallon": 25, "leakReduction": 0.25 }
+  },
+  "armor": {
+    "plastic": { "costMultiplier": 1.0, "weightMultiplier": 1.0 },
+    "fireproof": { "costMultiplier": 2.0, "weightMultiplier": 1.0, "fireProof": true },
+    "laserReflective": { "costMultiplier": 1.1, "weightMultiplier": 1.1, "laserDamageMultiplier": 0.5 },
+    "laserReflectiveFireproof": { "costMultiplier": 2.5, "weightMultiplier": 1.1, "fireProof": true, "laserDamageMultiplier": 0.5 },
+    "radarproof": { "costMultiplier": 2.0, "weightMultiplier": 1.0, "radarInvisible": true },
+    "metal": { "costMultiplier": 2.5, "weightMultiplier": 5.0, "nonAblative": true, "fireProof": true }
+  },
+  "weapons": {
+    "smallBoreProjectile": {
+      "machineGun": { "abbr": "MG", "toHit": 7, "damage": "1d", "dp": 3, "cost": 1000, "weight": 150, "spaces": 1, "shots": 20, "cps": 25, "wps": 2.5 },
+      "vulcanMG": { "abbr": "VMG", "toHit": 6, "damage": "2d", "dp": 3, "cost": 2000, "weight": 350, "spaces": 2, "shots": 20, "cps": 35, "wps": 5 },
+      "flechetteGun": { "abbr": "FG", "toHit": 6, "damage": "1d+1", "dp": 2, "cost": 700, "weight": 100, "spaces": 1, "shots": 20, "cps": 10, "wps": 2.5 },
+      "vehicularShotgun": { "abbr": "VS", "toHit": 6, "damage": "2hits", "dp": 2, "cost": 950, "weight": 90, "spaces": 1, "shots": 10, "cps": 5, "wps": 1 },
+      "gaussGun": { "abbr": "GG", "toHit": 6, "damage": "3d", "dp": 3, "cost": 10000, "weight": 300, "spaces": 2, "shots": 10, "cps": 50, "wps": 10 },
+      "recoillessRifle": { "abbr": "RR", "toHit": 7, "damage": "2d", "dp": 4, "cost": 1500, "weight": 300, "spaces": 2, "shots": 10, "cps": 35, "wps": 5, "effect": "2in radius" },
+      "autocannon": { "abbr": "AC", "toHit": 6, "damage": "3d", "dp": 4, "cost": 6500, "weight": 500, "spaces": 3, "shots": 10, "cps": 75, "wps": 10, "effect": "2in radius" }
+    },
+    "largeBoreProjectile": {
+      "bomb": { "abbr": "B", "toHit": 9, "damage": "4d", "dp": 2, "cost": 100, "weight": 100, "spaces": 1, "shots": 1, "effect": "2in radius" },
+      "clusterBomb": { "abbr": "CB", "toHit": 9, "damage": "2d", "dp": 2, "cost": 200, "weight": 150, "spaces": 1, "shots": 1, "effect": "3in radius" },
+      "spikeGun": { "abbr": "SG", "toHit": 7, "damage": "1d", "dp": 2, "cost": 750, "weight": 150, "spaces": 2, "shots": 10, "cps": 40, "wps": 10 },
+      "grenadeLauncher": { "abbr": "GL", "toHit": 7, "dp": 2, "cost": 1000, "weight": 200, "spaces": 2, "shots": 10, "wps": 4 },
+      "antiTankGun": { "abbr": "ATG", "toHit": 8, "damage": "3d", "dp": 5, "cost": 2000, "weight": 600, "spaces": 3, "shots": 10, "cps": 50, "wps": 10, "effect": "2in radius" },
+      "blastCannon": { "abbr": "BC", "toHit": 7, "damage": "4d", "dp": 5, "cost": 4500, "weight": 500, "spaces": 4, "shots": 10, "cps": 100, "wps": 10, "effect": "2in radius" },
+      "tankGun": { "abbr": "TG", "toHit": 7, "damage": "8d", "dp": 10, "cost": 10000, "weight": 1200, "spaces": 10, "shots": 10, "cps": 100, "wps": 20, "effect": "2in radius" }
+    },
+    "rockets": {
+      "miniRocket": { "abbr": "MNR", "toHit": 9, "damage": "1d-1", "dp": 1, "cost": 50, "weight": 20, "spaces": 0.33, "shots": 1, "effect": "0.5in radius" },
+      "lightRocket": { "abbr": "LtR", "toHit": 9, "damage": "1d", "dp": 1, "cost": 75, "weight": 25, "spaces": 0.5, "shots": 1, "effect": "1in radius" },
+      "mediumRocket": { "abbr": "MR", "toHit": 9, "damage": "2d", "dp": 2, "cost": 140, "weight": 50, "spaces": 1, "shots": 1, "effect": "1in radius" },
+      "heavyRocket": { "abbr": "HR", "toHit": 9, "damage": "3d", "dp": 2, "cost": 200, "weight": 100, "spaces": 1, "shots": 1, "effect": "2in radius" },
+      "antiPowerPlantRocket": { "abbr": "APPR", "toHit": 9, "damage": "1d-1", "dp": 1, "cost": 500, "weight": 40, "spaces": 1, "shots": 1, "effect": "1in radius", "special": "Targets power plant" },
+      "surfaceToAirMissile": { "abbr": "SAM", "toHit": "6/11", "damage": "4d", "dp": 3, "cost": 500, "weight": 150, "spaces": 1, "shots": 1, "effect": "2in radius" },
+      "radarGuidedMissile": { "abbr": "RGM", "toHit": 7, "damage": "3d", "dp": 1, "cost": 3000, "weight": 100, "spaces": 1, "shots": 1, "effect": "2in radius" },
+      "wireGuidedMissile": { "abbr": "WGM", "toHit": 6, "damage": "3d", "dp": 2, "cost": 2000, "weight": 100, "spaces": 1, "shots": 1, "effect": "2in radius" },
+      "rocketLauncher": { "abbr": "RL", "toHit": 8, "damage": "2d", "dp": 2, "cost": 1000, "weight": 200, "spaces": 2, "shots": 10, "cps": 35, "wps": 5, "effect": "2in radius" },
+      "variableFireRocketPod": { "abbr": "VFRP", "toHit": 9, "damage": "1d×6", "dp": 5, "cost": 2000, "weight": 200, "spaces": 3, "shots": 30, "cps": 35, "wps": 7.5, "effect": "2in radius" },
+      "micromissileLauncher": { "abbr": "MML", "toHit": 8, "damage": "1", "dp": 2, "cost": 750, "weight": 100, "spaces": 1, "shots": 10, "cps": 20, "wps": 2.5, "effect": "1in radius" }
+    },
+    "lasers": {
+      "targetingLaser": { "abbr": "TL", "toHit": 6, "dp": 1, "cost": 1000, "weight": 50, "spaces": 0, "powerDrain": 0 },
+      "lightLaser": { "abbr": "LL", "toHit": 6, "damage": "1d", "dp": 2, "cost": 3000, "weight": 200, "spaces": 1, "powerDrain": 1 },
+      "mediumLaser": { "abbr": "ML", "toHit": 6, "damage": "2d", "dp": 2, "cost": 5500, "weight": 350, "spaces": 2, "powerDrain": 2 },
+      "laser": { "abbr": "L", "toHit": 6, "damage": "3d", "dp": 2, "cost": 8000, "weight": 500, "spaces": 2, "powerDrain": 2 },
+      "twinLaser": { "abbr": "TwL", "toHit": 6, "damage": "2d+6", "dp": 3, "cost": 10000, "weight": 750, "spaces": 2, "powerDrain": 3 },
+      "heavyLaser": { "abbr": "HL", "toHit": 6, "damage": "4d", "dp": 2, "cost": 12000, "weight": 1000, "spaces": 3, "powerDrain": 3 },
+      "xrayLaser": { "abbr": "XL", "toHit": 7, "damage": "4d", "dp": 3, "cost": 15000, "weight": 750, "spaces": 3, "powerDrain": 3 },
+      "heavyXrayLaser": { "abbr": "HXL", "toHit": 7, "damage": "5d", "dp": 3, "cost": 20000, "weight": 1500, "spaces": 5, "powerDrain": 4 }
+    },
+    "flamethrowers": {
+      "lightFlamethrower": { "abbr": "LFT", "toHit": 6, "damage": "1d-2", "dp": 1, "cost": 350, "weight": 250, "spaces": 1, "shots": 10, "cps": 15, "wps": 3, "maxRange": "5in" },
+      "flamethrower": { "abbr": "FT", "toHit": 6, "damage": "1d", "dp": 2, "cost": 500, "weight": 450, "spaces": 2, "shots": 10, "cps": 25, "wps": 5, "maxRange": "10in" },
+      "hdFlamethrower": { "abbr": "HDFT", "toHit": 6, "damage": "2d", "dp": 3, "cost": 1250, "weight": 650, "spaces": 3, "shots": 10, "cps": 50, "wps": 10, "maxRange": "15in" }
+    },
+    "droppedGases": {
+      "smokescreen": { "abbr": "SS", "dp": 4, "cost": 250, "weight": 25, "spaces": 1, "shots": 10, "cps": 10, "wps": 5, "effect": "0.5in×1in" },
+      "paintSpray": { "abbr": "PS", "dp": 2, "cost": 400, "weight": 25, "spaces": 1, "shots": 25, "cps": 10, "wps": 2, "effect": "0.5in×1in" },
+      "hdSmokescreen": { "abbr": "HDSS", "dp": 4, "cost": 500, "weight": 50, "spaces": 2, "shots": 10, "cps": 40, "wps": 20, "effect": "1in×2in" },
+      "flameCloudEjector": { "abbr": "FCE", "damage": "1d-1", "dp": 1, "cost": 500, "weight": 50, "spaces": 2, "shots": 10, "cps": 60, "wps": 5, "effect": "0.5in×1in" }
+    },
+    "droppedLiquids": {
+      "oilJet": { "abbr": "OJ", "dp": 3, "cost": 250, "weight": 25, "spaces": 2, "shots": 25, "cps": 10, "wps": 2, "effect": "0.5in×1in" },
+      "hdOilJet": { "abbr": "HDOJ", "dp": 4, "cost": 500, "weight": 50, "spaces": 3, "shots": 10, "cps": 40, "wps": 8, "effect": "1in×2in" },
+      "flamingOilJet": { "abbr": "FOJ", "damage": "1d-2", "dp": 3, "cost": 300, "weight": 30, "spaces": 2, "shots": 25, "cps": 35, "wps": 2, "effect": "0.5in×1in" },
+      "iceDropper": { "abbr": "ID", "dp": 3, "cost": 750, "weight": 50, "spaces": 2, "shots": 25, "cps": 20, "wps": 2, "effect": "0.5in×1in" }
+    },
+    "droppedSolids": {
+      "spikedropper": { "abbr": "SD", "damage": "1d", "dp": 4, "cost": 100, "weight": 25, "spaces": 1, "shots": 10, "cps": 20, "wps": 5, "effect": "0.5in×0.5in" },
+      "minedropper": { "abbr": "MD", "damage": "1d/2d", "dp": 2, "cost": 500, "weight": 150, "spaces": 2, "shots": 10, "cps": 50, "wps": 5, "effect": "0.5in×0.5in" },
+      "junkDropper": { "abbr": "JD", "damage": "1d-3", "dp": 4, "cost": 50, "weight": 25, "spaces": 1, "shots": 5, "cps": 0, "wps": 25, "effect": "0.5in×0.5in" }
+    }
+  },
+  "ammoTypes": {
+    "machineGun": {
+      "standard": { "damage": "1d", "cpsMultiplier": 1 },
+      "hd": { "damage": "1d+1", "cpsMultiplier": 2 },
+      "incendiary": { "damage": "1d", "cpsMultiplier": 1.5, "causeFire": true },
+      "antipersonnel": { "damage": "1d", "cpsMultiplier": 5, "doubleDamageToPedestrians": true },
+      "explosive": { "damage": "1d", "cpsMultiplier": 2, "effect": "0.25in radius" }
+    },
+    "rockets": {
+      "standard": { "damageModifier": 0 },
+      "incendiary": { "damageModifier": "+1/die", "causeFire": true, "costMultiplier": 2, "weightMultiplier": 1.5 },
+      "armorPiercing": { "damageModifier": "+1/die", "costMultiplier": 1.5 }
+    },
+    "atg": {
+      "standard": { "damage": "3d" },
+      "heat": { "damage": "3d+3" },
+      "apfsds": { "damage": "3d+6" },
+      "hesh": { "damage": "3d" }
+    }
+  },
+  "accessories": {
+    "offense": {
+      "turret": {
+        "oneSpace": { "cost": 1000, "weight": 100, "spaces": 1 },
+        "twoSpace": { "cost": 1500, "weight": 150, "spaces": 2 },
+        "threeSpace": { "cost": 2500, "weight": 250, "spaces": 3 },
+        "fourSpace": { "cost": 3500, "weight": 350, "spaces": 4 }
+      },
+      "popUpTurret": {
+        "oneSpace": { "cost": 1500, "weight": 150, "spaces": 2 },
+        "twoSpace": { "cost": 2500, "weight": 250, "spaces": 3 }
+      },
+      "externalWeaponPod": {
+        "oneSpace": { "cost": 500, "weight": 150 },
+        "twoSpace": { "cost": 1000, "weight": 250 },
+        "threeSpace": { "cost": 2000, "weight": 400 },
+        "fourSpace": { "cost": 3000, "weight": 600 }
+      },
+      "cupola": {
+        "threeSpace": { "cost": 3500, "weight": 400, "spaces": 2 },
+        "threeSpacePopUp": { "cost": 4500, "weight": 600, "spaces": 5 },
+        "fourSpace": { "cost": 5500, "weight": 500, "spaces": 2 },
+        "fourSpacePopUp": { "cost": 6500, "weight": 750, "spaces": 6 }
+      },
+      "bumperSpikes": { "note": "Cost/weight = 5 points armor", "bonusDamage": "1d" },
+      "ramplate": { "note": "Cost = 1.5× front armor, Weight = 0.5× front armor", "damageModifier": "+2/die to target, -1/die to self" },
+      "brushcutter": { "cost": 100, "weight": 20, "bonusPedestrianDamage": 2 },
+      "blowThroughConcealment": { "cost": 100, "weight": 10 },
+      "cyberlink": { "cost": 16000, "weight": 100, "spaces": 1, "toHitBonus": 3 },
+      "link": { "cost": 50, "weight": 0, "spaces": 0 },
+      "extraMagazine": { "cost": 50, "weight": 15, "spaces": 1, "dpBonus": 1 },
+      "magazineSwitch": { "cost": 250, "weight": 0, "spaces": 0 },
+      "laserGuidanceLink": { "cost": 500, "perRocket": 200 },
+      "laserBattery": { "cost": 500, "weight": 100, "spaces": 1, "dp": 1, "powerUnits": 100 }
+    },
+    "defense": {
+      "fireExtinguisher": { "cost": 150, "weight": 25, "spaces": 1, "shots": 6 },
+      "improvedFireExtinguisher": { "cost": 500, "weight": 50, "spaces": 1, "shots": 6 },
+      "fireRetardantInsulator": { "cost": 100, "weight": 10, "spaces": 0 },
+      "componentArmor": { "costPerPoint": 5, "weightPerPoint": 2 }
+    },
+    "miscellaneous": {
+      "hd_tires": { "costMultiplier": 2, "dpMultiplier": 1.5 },
+      "solidTires": { "costMultiplier": 4, "dpMultiplier": 3, "note": "Cannot blowout" },
+      "wheelguards": { "costPerPoint": 3, "weightPerPoint": 1 },
+      "wheelHubs": { "cost": 100, "weight": 10, "dp": 3, "note": "Per wheel" },
+      "spoiler": { "cost": 100, "weight": 50, "hcBonus": 1, "note": "At 60+ mph" },
+      "airdam": { "cost": 100, "weight": 50, "hcBonus": 1, "note": "At 60+ mph, front only" },
+      "hdShocks": { "cost": 500, "weight": 100, "hcBonus": 1 },
+      "overdrive": { "cost": 1000, "weight": 50, "topSpeedBonus": "10%" },
+      "antiLockBrakes": { "cost": 1000, "weight": 100 },
+      "computerGunner": { "cost": 3000, "weight": 100, "spaces": 1, "toHitBonus": 1 },
+      "targetingComputer": { "cost": 1000, "weight": 50, "spaces": 0, "toHitBonus": 1 },
+      "radar": { "cost": 2000, "weight": 100, "spaces": 1 },
+      "radarDetector": { "cost": 100, "weight": 0, "spaces": 0 },
+      "radarJammer": { "cost": 3000, "weight": 200, "spaces": 1 }
+    }
+  },
+  "tires": {
+    "standard": { "dp": 4, "cost": 50, "weight": 15 },
+    "heavyDuty": { "dp": 6, "cost": 100, "weight": 25 },
+    "solid": { "dp": 12, "cost": 200, "weight": 40, "note": "Cannot blowout" },
+    "plasticore": { "dp": 9, "cost": 150, "weight": 30 },
+    "fireproof": { "dpBonus": 0, "costMultiplier": 1.5, "note": "Cannot catch fire" },
+    "offRoad": { "costMultiplier": 2, "note": "Reduced off-road penalties" }
+  },
+  "images": {
+    "basePath": "books/images/",
+    "sources": {
+      "compendium": "compendium/",
+      "uncleAlberts": "uncle_alberts/",
+      "deluxe": "deluxe/"
+    },
+    "counts": {
+      "compendium": 1916,
+      "uncleAlberts": 211,
+      "deluxe": 82
+    }
+  },
+  "textSources": {
+    "compendium": "books/Car_Wars_Compendium.txt",
+    "uncleAlberts": "books/Uncle_Alberts_Catalog.txt",
+    "deluxe": "books/Car_Wars_Deluxe.txt"
+  },
+  "movement": {
+    "_description": "Car Wars turn-based movement system. 1 turn = 1 second = 5 phases. Scale: 1 inch = 15 feet.",
+    "turnStructure": {
+      "turnDuration": "1 second",
+      "phasesPerTurn": 5,
+      "phaseOrder": [1, 2, 3, 4, 5],
+      "phaseActions": {
+        "startOfPhase": ["Announce speed change (accel/decel)", "Make control rolls", "Resolve crash table results"],
+        "duringPhase": ["Move vehicles in speed order (fastest first)", "One maneuver per phase max", "Weapons fire"],
+        "endOfTurn": ["Regain handling status (HC + driver skill, min 1)", "Advance turn counter"]
+      }
+    },
+    "movementChart": {
+      "_note": "Shows movement per phase. '1' = 1 inch move (can maneuver). '2' = 2 inch move. '1/2' = half-inch (no maneuver).",
+      "speeds": {
+        "0":   { "phases": [0, 0, 0, 0, 0], "totalInches": 0, "ramDamage": "0" },
+        "5":   { "phases": [0.5, 0, 0, 0, 0], "totalInches": 0.5, "ramDamage": "1d-4" },
+        "10":  { "phases": [1, 0, 0, 0, 0], "totalInches": 1, "ramDamage": "1d-2" },
+        "15":  { "phases": [1, 0, 0.5, 0, 0], "totalInches": 1.5, "ramDamage": "1d-1" },
+        "20":  { "phases": [1, 0, 1, 0, 0], "totalInches": 2, "ramDamage": "1d" },
+        "25":  { "phases": [1, 0, 1, 0, 0.5], "totalInches": 2.5, "ramDamage": "1d" },
+        "30":  { "phases": [1, 0, 1, 0, 1], "totalInches": 3, "ramDamage": "1d" },
+        "35":  { "phases": [1, 0.5, 1, 0, 1], "totalInches": 3.5, "ramDamage": "2d" },
+        "40":  { "phases": [1, 1, 1, 0, 1], "totalInches": 4, "ramDamage": "3d" },
+        "45":  { "phases": [1, 1, 1, 0.5, 1], "totalInches": 4.5, "ramDamage": "4d" },
+        "50":  { "phases": [1, 1, 1, 1, 1], "totalInches": 5, "ramDamage": "5d" },
+        "55":  { "phases": [1.5, 1, 1, 1, 1], "totalInches": 5.5, "ramDamage": "6d" },
+        "60":  { "phases": [2, 1, 1, 1, 1], "totalInches": 6, "ramDamage": "7d" },
+        "65":  { "phases": [2, 1, 1.5, 1, 1], "totalInches": 6.5, "ramDamage": "8d" },
+        "70":  { "phases": [2, 1, 2, 1, 1], "totalInches": 7, "ramDamage": "9d" },
+        "75":  { "phases": [2, 1, 2, 1, 1.5], "totalInches": 7.5, "ramDamage": "10d" },
+        "80":  { "phases": [2, 1, 2, 1, 2], "totalInches": 8, "ramDamage": "11d" },
+        "85":  { "phases": [2, 1.5, 2, 1, 2], "totalInches": 8.5, "ramDamage": "12d" },
+        "90":  { "phases": [2, 2, 2, 1, 2], "totalInches": 9, "ramDamage": "13d" },
+        "95":  { "phases": [2, 2, 2, 1.5, 2], "totalInches": 9.5, "ramDamage": "14d" },
+        "100": { "phases": [2, 2, 2, 2, 2], "totalInches": 10, "ramDamage": "15d" }
+      }
+    },
+    "speedChange": {
+      "acceleration": {
+        "_note": "Max acceleration depends on vehicle's power plant and weight. Typical 5-15 mph/turn.",
+        "timing": "Once per turn, at beginning of any phase, before movement"
+      },
+      "deceleration": {
+        "safe": { "maxMph": 10, "difficulty": 0, "tireDamage": 0 },
+        "15mph": { "difficulty": 1, "tireDamage": 0 },
+        "20mph": { "difficulty": 2, "tireDamage": 0 },
+        "25mph": { "difficulty": 3, "tireDamage": 0 },
+        "30mph": { "difficulty": 5, "tireDamage": 0 },
+        "35mph": { "difficulty": 7, "tireDamage": 2 },
+        "40mph": { "difficulty": 9, "tireDamage": "1d" },
+        "45mph": { "difficulty": 11, "tireDamage": "1d+3" },
+        "_note": "Max deceleration without special devices is 45 mph/turn"
+      }
+    },
+    "maneuvers": {
+      "_note": "Each maneuver has a Difficulty (D) rating. Higher D = more handling status lost = higher chance of losing control.",
+      "bend": {
+        "description": "Vehicle moves 1 inch forward, then angles to one side keeping one rear corner fixed",
+        "difficulties": {
+          "15deg": 1,
+          "30deg": 2,
+          "45deg": 3,
+          "60deg": 4,
+          "75deg": 5,
+          "90deg": 6
+        }
+      },
+      "drift": {
+        "description": "Vehicle moves 1 inch forward and up to 1/4 inch sideways, keeping same heading",
+        "difficulty": 1
+      },
+      "steepDrift": {
+        "description": "Vehicle moves 1 inch forward and 1/4 to 1/2 inch sideways",
+        "difficulty": 3
+      },
+      "swerve": {
+        "description": "1/4 inch drift followed by a bend in opposite direction, same phase",
+        "difficulty": "Bend difficulty + 1"
+      },
+      "controlledSkid": {
+        "description": "Perform bend/swerve, then skid in original direction",
+        "options": {
+          "quarterInch": { "addedDifficulty": 1, "weaponPenalty": -1, "deceleration": 0, "tireDamage": 0 },
+          "halfInch": { "addedDifficulty": 2, "weaponPenalty": -3, "deceleration": 5, "tireDamage": 0 },
+          "threeQuarterInch": { "addedDifficulty": 3, "weaponPenalty": -6, "deceleration": 5, "tireDamage": 1 },
+          "oneInch": { "addedDifficulty": 4, "weaponPenalty": "noFire", "deceleration": 10, "tireDamage": 2 }
+        }
+      },
+      "bootleggerReverse": {
+        "description": "J-turn to reverse direction. Must start at 20-35 mph.",
+        "difficulty": 7,
+        "tireDamage": 1,
+        "restrictions": ["Cannot fire aimed weapons until stopped", "Cycles and oversized vehicles cannot perform", "No other maneuvers can combine"],
+        "result": "Vehicle ends at 0 mph facing opposite direction"
+      },
+      "tStop": {
+        "description": "Emergency stop: rotate 90° and skid sideways until halted",
+        "difficulty": "D1 per 10 mph of deceleration",
+        "deceleration": "20 mph per inch of movement",
+        "tireDamage": "1 per 20 mph lost",
+        "restrictions": ["Cannot fire aimed weapons"]
+      },
+      "pivot": {
+        "description": "At 5 mph only: move 1/4 inch forward, then pivot any amount around one rear corner",
+        "difficulty": 0,
+        "speedRequirement": 5
+      },
+      "reverse": {
+        "description": "Move backwards at up to 1/5 top speed. Must stop for 1 turn to change direction.",
+        "difficultyModifier": "+1 to all maneuvers"
+      }
+    },
+    "handlingSystem": {
+      "_note": "Handling Status tracks how 'in control' the vehicle is. Starts at HC, reduced by maneuvers/hazards.",
+      "handlingClass": {
+        "description": "Base maneuverability from suspension. Modified by driver reflexes.",
+        "reflexRoll": {
+          "roll": "1d6 at start of combat",
+          "5": "+1 HC for combat",
+          "6+": "+2 HC for combat"
+        },
+        "driverSkillBonus": "Added to reflex roll"
+      },
+      "handlingStatus": {
+        "start": "Equals modified Handling Class",
+        "reduction": "Decreased by maneuver Difficulty or hazard",
+        "minimum": -6,
+        "recovery": "At end of each turn: +HC (min +1), cannot exceed starting HC"
+      },
+      "controlRoll": {
+        "description": "When handling status drops, check Control Table. Roll 1d6 to keep control.",
+        "results": {
+          "safe": "No roll needed",
+          "number": "Must roll that number or higher on 1d6",
+          "XX": "Automatic loss of control, go to Crash Table"
+        }
+      }
+    },
+    "controlTable": {
+      "_note": "Cross-reference speed and handling status. Shows control roll needed or 'safe'/'XX'.",
+      "speedRanges": ["5-10", "15-20", "25-30", "35-40", "45-50", "55-60", "65-70", "75-80", "85-90", "95-100"],
+      "crashModifiers": {
+        "5-10": -3, "15-20": -2, "25-30": -1, "35-40": 0, "45-50": 1, "55-60": 1,
+        "65-70": 2, "75-80": 2, "85-90": 2, "95-100": 3
+      },
+      "_simplifiedTable": "At HC 0 or above: generally safe. At HC -1 to -3: rolls needed (2-5). At HC -4 to -6: harder rolls or XX."
+    },
+    "hazards": {
+      "description": "External events that reduce handling status",
+      "types": {
+        "curb_obstacle_pedestrian": { "difficulty": 3 },
+        "looseDebris": { "difficulty": 1 },
+        "enemyFire_1to5hits": { "difficulty": 1 },
+        "enemyFire_6to9hits": { "difficulty": 2 },
+        "enemyFire_10plusHits": { "difficulty": 3 },
+        "driverInjured": { "difficulty": 2 },
+        "tireBlowout_first": { "difficulty": 2 },
+        "tireBlowout_subsequent": { "difficulty": 3 }
+      },
+      "roadConditions": {
+        "offRoad": { "addedDifficulty": 1, "appliesTo": "maneuvers" },
+        "lightRain": { "addedDifficulty": 1, "appliesTo": "all" },
+        "heavyRain": { "addedDifficulty": 2, "appliesTo": "all" },
+        "gravel": { "addedDifficulty": 1, "appliesTo": "all" },
+        "oil": { "addedDifficulty": 2, "appliesTo": "all" },
+        "lightSnow": { "addedDifficulty": 2, "appliesTo": "all" },
+        "heavySnow": { "addedDifficulty": 3, "appliesTo": "all" },
+        "ice": { "addedDifficulty": 4, "appliesTo": "all" }
+      }
+    },
+    "crashTables": {
+      "_note": "Roll 2d6 + modifiers when control is lost",
+      "table1_maneuvers": {
+        "2orLess": { "result": "Trivial skid", "skid": 0.25, "speedLoss": 0 },
+        "3-4": { "result": "Minor skid", "skid": 0.5, "speedLoss": 5 },
+        "5-6": { "result": "Moderate skid", "skid": 0.75, "speedLoss": 10, "tireDamage": 1 },
+        "7-8": { "result": "Severe skid", "skid": 1, "speedLoss": 20, "tireDamage": 2 },
+        "9-10": { "result": "Spinout", "rotation": 90, "decel": "20mph/turn", "tireDamage": "1d" },
+        "11-12": { "result": "Roll", "description": "Vehicle rolls, taking 1d damage per side hit" },
+        "13-14": { "result": "Roll + possible fire", "fireChance": "4-6 on 1d6" },
+        "15+": { "result": "Vault", "description": "Vehicle flips through air 1-6 inches" }
+      },
+      "table2_hazards": {
+        "1-4": { "result": "Minor fishtail", "rearMove": 1 },
+        "5-8": { "result": "Major fishtail", "rearMove": 2 },
+        "9-10": { "result": "Minor fishtail + roll on Table 1" },
+        "11-14": { "result": "Major fishtail + roll on Table 1" },
+        "15+": { "result": "Major + minor fishtail + roll on Table 1" }
+      },
+      "modifiers": {
+        "driverSkill": "Subtract from roll",
+        "maneuverDifficulty": "Add (D - 3) to roll",
+        "speed": "Add crash modifier from Control Table"
+      }
+    },
+    "playerTurnInput": {
+      "_description": "What the player decides at start of their planning phase",
+      "decisions": {
+        "speedChange": {
+          "options": ["accelerate", "decelerate", "maintain"],
+          "amount": "0 to max accel/decel",
+          "timing": "Once per turn, before any movement"
+        },
+        "maneuverPlan": {
+          "description": "Plan ONE maneuver for each phase you move this turn",
+          "forEachPhase": {
+            "options": ["straight", "bend", "drift", "swerve", "controlledSkid", "special"],
+            "bendAngle": "15, 30, 45, 60, 75, or 90 degrees",
+            "direction": "left or right"
+          }
+        },
+        "weaponTargets": {
+          "description": "Select targets for each weapon",
+          "options": ["target vehicle/object", "autofire straight ahead", "hold fire"]
+        }
+      },
+      "constraints": {
+        "oneManeuverPerPhase": true,
+        "speedChangeOncePerTurn": true,
+        "halfMoveCannotManeuver": true,
+        "maneuverReplaces1inchMovement": true
+      }
+    }
+  }
+}

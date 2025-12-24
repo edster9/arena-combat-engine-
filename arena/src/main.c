@@ -16,6 +16,8 @@
 #include "render/mesh.h"
 #include "render/obj_loader.h"
 #include "game/entity.h"
+#include "ui/ui_render.h"
+#include "ui/ui_text.h"
 
 #include <GL/glew.h>
 #include <stdio.h>
@@ -35,6 +37,25 @@
 #define ARENA_SIZE 60.0f
 #define WALL_HEIGHT 4.0f
 #define WALL_THICKNESS 1.0f
+
+// Planning UI state
+typedef enum {
+    SPEED_BRAKE = 0,
+    SPEED_HOLD = 1,
+    SPEED_ACCEL = 2
+} SpeedChoice;
+
+typedef struct {
+    SpeedChoice speed_choice;
+    int selected_phase;      // 0-4, which phase box is selected
+    int current_speed;       // Current speed in mph
+} PlanningState;
+
+// Check if point is inside rect
+static bool point_in_rect(float px, float py, UIRect rect) {
+    return px >= rect.x && px <= rect.x + rect.width &&
+           py >= rect.y && py <= rect.y + rect.height;
+}
 
 // Draw arena walls
 static void draw_arena_walls(BoxRenderer* r) {
@@ -106,32 +127,20 @@ static void draw_placeholder_car(BoxRenderer* r, Vec3 pos, float rotation_y, Vec
                       vec3(wheel_radius*2, wheel_radius*2, wheel_width), wheel_color);
 }
 
-// Draw obstacle blocks in the arena
+// Draw obstacle blocks in the arena (simplified for showdown)
 static void draw_obstacles(BoxRenderer* r) {
-    Vec3 barrier_color = vec3(0.7f, 0.3f, 0.2f);   // Rusty red
-    Vec3 crate_color = vec3(0.6f, 0.5f, 0.3f);     // Wooden brown
     Vec3 pillar_color = vec3(0.4f, 0.4f, 0.45f);   // Dark concrete
+    Vec3 barrier_color = vec3(0.6f, 0.35f, 0.25f); // Rusty barrier
 
-    // Central barriers (cross pattern)
-    box_renderer_draw(r, vec3(0, 1.0f, 0), vec3(8, 2, 2), barrier_color);
-    box_renderer_draw(r, vec3(0, 1.0f, 0), vec3(2, 2, 8), barrier_color);
+    // Central pillar - forces cars to maneuver around
+    box_renderer_draw(r, vec3(0, 2.0f, 0), vec3(5, 4, 5), barrier_color);
 
     // Corner pillars
-    float corner_offset = 20.0f;
+    float corner_offset = 22.0f;
     box_renderer_draw(r, vec3(corner_offset, 2.0f, corner_offset), vec3(3, 4, 3), pillar_color);
     box_renderer_draw(r, vec3(-corner_offset, 2.0f, corner_offset), vec3(3, 4, 3), pillar_color);
     box_renderer_draw(r, vec3(corner_offset, 2.0f, -corner_offset), vec3(3, 4, 3), pillar_color);
     box_renderer_draw(r, vec3(-corner_offset, 2.0f, -corner_offset), vec3(3, 4, 3), pillar_color);
-
-    // Scattered crates
-    box_renderer_draw(r, vec3(10, 1.0f, 5), vec3(2, 2, 2), crate_color);
-    box_renderer_draw(r, vec3(-12, 1.0f, -8), vec3(2, 2, 2), crate_color);
-    box_renderer_draw(r, vec3(8, 1.0f, -15), vec3(2, 2, 2), crate_color);
-    box_renderer_draw(r, vec3(-5, 1.0f, 12), vec3(2, 2, 2), crate_color);
-
-    // Long barrier walls
-    box_renderer_draw(r, vec3(15, 1.5f, 0), vec3(1.5f, 3, 12), barrier_color);
-    box_renderer_draw(r, vec3(-15, 1.5f, 0), vec3(1.5f, 3, 12), barrier_color);
 }
 
 // Draw all vehicle entities
@@ -154,45 +163,23 @@ static void draw_entities(BoxRenderer* r, EntityManager* em, LoadedMesh* car_mes
     }
 }
 
-// Create initial test vehicles
+// Create showdown vehicles - 2 cars facing each other
 static void create_test_vehicles(EntityManager* em, float car_scale) {
     Entity* e;
 
-    // Red team
+    // Red car - south side near wall, facing north (toward blue)
     e = entity_manager_create(em, ENTITY_VEHICLE, TEAM_RED);
-    e->position = vec3(5, 0, 8);
-    e->rotation_y = 0.0f;
+    e->position = vec3(0, 0, -26);
+    e->rotation_y = 0.0f;  // Facing +Z (north)
     e->scale = car_scale;
 
-    e = entity_manager_create(em, ENTITY_VEHICLE, TEAM_RED);
-    e->position = vec3(-8, 0, 5);
-    e->rotation_y = (float)(M_PI * 0.5);
-    e->scale = car_scale;
-
-    // Blue team
+    // Blue car - north side near wall, facing south (toward red)
     e = entity_manager_create(em, ENTITY_VEHICLE, TEAM_BLUE);
-    e->position = vec3(-5, 0, -10);
-    e->rotation_y = (float)M_PI;
+    e->position = vec3(0, 0, 26);
+    e->rotation_y = (float)M_PI;  // Facing -Z (south)
     e->scale = car_scale;
 
-    e = entity_manager_create(em, ENTITY_VEHICLE, TEAM_BLUE);
-    e->position = vec3(10, 0, -6);
-    e->rotation_y = (float)(M_PI * 1.5);
-    e->scale = car_scale;
-
-    // Yellow team
-    e = entity_manager_create(em, ENTITY_VEHICLE, TEAM_YELLOW);
-    e->position = vec3(20, 0, 15);
-    e->rotation_y = (float)(M_PI * 0.25);
-    e->scale = car_scale;
-
-    // Green team
-    e = entity_manager_create(em, ENTITY_VEHICLE, TEAM_GREEN);
-    e->position = vec3(-22, 0, -18);
-    e->rotation_y = (float)(M_PI * 1.25);
-    e->scale = car_scale;
-
-    printf("Created %d vehicles\n", em->count);
+    printf("Created %d vehicles (showdown mode)\n", em->count);
 }
 
 int main(int argc, char* argv[]) {
@@ -260,6 +247,21 @@ int main(int argc, char* argv[]) {
     entity_manager_init(&entities);
     create_test_vehicles(&entities, car_scale);
 
+    // Initialize UI renderer
+    UIRenderer ui_renderer;
+    if (!ui_renderer_init(&ui_renderer)) {
+        fprintf(stderr, "Failed to initialize UI renderer\n");
+        // Continue anyway, just won't have UI
+    }
+
+    // Initialize text renderer
+    TextRenderer text_renderer;
+    bool has_text = text_renderer_init(&text_renderer, "assets/fonts/Roboto-Bold.ttf", 18.0f);
+    if (!has_text) {
+        fprintf(stderr, "Failed to initialize text renderer\n");
+        // Continue anyway, just won't have text
+    }
+
     // Light direction (sun from upper-right-front)
     Vec3 light_dir = vec3_normalize(vec3(0.5f, -1.0f, 0.3f));
 
@@ -270,6 +272,13 @@ int main(int argc, char* argv[]) {
     // OpenGL setup
     glEnable(GL_DEPTH_TEST);
     glClearColor(0.15f, 0.15f, 0.18f, 1.0f);
+
+    // Planning state
+    PlanningState planning = {
+        .speed_choice = SPEED_HOLD,
+        .selected_phase = 0,
+        .current_speed = 0  // Starting from standstill
+    };
 
     // Timing
     double last_time = platform_get_time();
@@ -317,26 +326,60 @@ int main(int argc, char* argv[]) {
             platform.should_quit = true;
         }
 
-        // Left click to select vehicles (only when not looking around)
+        // Left click handling (UI buttons first, then 3D picking)
         if (input.mouse_pressed[MOUSE_LEFT] && !input.mouse_captured) {
-            Vec3 ray_origin, ray_dir;
-            camera_screen_to_ray(&camera, input.mouse_x, input.mouse_y,
-                                 platform.width, platform.height,
-                                 &ray_origin, &ray_dir);
+            float mx = (float)input.mouse_x;
+            float my = (float)input.mouse_y;
+            bool ui_clicked = false;
 
-            int hit_id = entity_manager_pick(&entities, ray_origin, ray_dir);
-            if (hit_id >= 0) {
-                entity_manager_select(&entities, hit_id);
-                Entity* selected = entity_manager_get_selected(&entities);
-                if (selected) {
-                    printf("Selected: %s team vehicle at (%.1f, %.1f)\n",
-                           selected->team == TEAM_RED ? "Red" :
-                           selected->team == TEAM_BLUE ? "Blue" :
-                           selected->team == TEAM_YELLOW ? "Yellow" : "Green",
-                           selected->position.x, selected->position.z);
+            // Speed button rects (must match rendering positions)
+            UIRect brake_btn = ui_rect(platform.width - 305, 100, 80, 50);
+            UIRect hold_btn = ui_rect(platform.width - 210, 100, 80, 50);
+            UIRect accel_btn = ui_rect(platform.width - 115, 100, 80, 50);
+
+            // Check speed button clicks
+            if (point_in_rect(mx, my, brake_btn)) {
+                planning.speed_choice = SPEED_BRAKE;
+                ui_clicked = true;
+            } else if (point_in_rect(mx, my, hold_btn)) {
+                planning.speed_choice = SPEED_HOLD;
+                ui_clicked = true;
+            } else if (point_in_rect(mx, my, accel_btn)) {
+                planning.speed_choice = SPEED_ACCEL;
+                ui_clicked = true;
+            }
+
+            // Check phase box clicks
+            for (int i = 0; i < 5; i++) {
+                UIRect phase_box = ui_rect(platform.width - 305 + i * 58, 200, 52, 80);
+                if (point_in_rect(mx, my, phase_box)) {
+                    planning.selected_phase = i;
+                    ui_clicked = true;
+                    break;
                 }
-            } else {
-                entity_manager_deselect_all(&entities);
+            }
+
+            // If no UI was clicked, do 3D picking
+            if (!ui_clicked) {
+                Vec3 ray_origin, ray_dir;
+                camera_screen_to_ray(&camera, input.mouse_x, input.mouse_y,
+                                     platform.width, platform.height,
+                                     &ray_origin, &ray_dir);
+
+                int hit_id = entity_manager_pick(&entities, ray_origin, ray_dir);
+                if (hit_id >= 0) {
+                    entity_manager_select(&entities, hit_id);
+                    Entity* selected = entity_manager_get_selected(&entities);
+                    if (selected) {
+                        printf("Selected: %s team vehicle at (%.1f, %.1f)\n",
+                               selected->team == TEAM_RED ? "Red" :
+                               selected->team == TEAM_BLUE ? "Blue" :
+                               selected->team == TEAM_YELLOW ? "Yellow" : "Green",
+                               selected->position.x, selected->position.z);
+                    }
+                } else {
+                    entity_manager_deselect_all(&entities);
+                }
             }
         }
 
@@ -362,11 +405,126 @@ int main(int argc, char* argv[]) {
         draw_entities(&box_renderer, &entities, &car_mesh);
         box_renderer_end(&box_renderer);
 
+        // Draw UI test panels
+        ui_renderer_begin(&ui_renderer, platform.width, platform.height);
+
+        // Right side panel (where controls will go)
+        ui_draw_panel(&ui_renderer,
+            ui_rect(platform.width - 320, 10, 310, platform.height - 20),
+            UI_COLOR_PANEL, UI_COLOR_SELECTED, 2.0f, 8.0f);
+
+        // Header bar
+        ui_draw_panel(&ui_renderer,
+            ui_rect(platform.width - 315, 15, 300, 40),
+            UI_COLOR_BG_DARK, UI_COLOR_ACCENT, 1.0f, 4.0f);
+
+        // Speed control section
+        ui_draw_panel(&ui_renderer,
+            ui_rect(platform.width - 315, 65, 300, 100),
+            UI_COLOR_BG_DARK, ui_color(0.3f, 0.3f, 0.4f, 1.0f), 1.0f, 4.0f);
+
+        // Three speed buttons (highlight selected)
+        {
+            float sel_border = 3.0f;
+            float norm_border = 1.0f;
+            ui_draw_panel(&ui_renderer,
+                ui_rect(platform.width - 305, 100, 80, 50),
+                UI_COLOR_DANGER, UI_COLOR_WHITE,
+                planning.speed_choice == SPEED_BRAKE ? sel_border : norm_border, 4.0f);
+            ui_draw_panel(&ui_renderer,
+                ui_rect(platform.width - 210, 100, 80, 50),
+                UI_COLOR_SELECTED, UI_COLOR_WHITE,
+                planning.speed_choice == SPEED_HOLD ? sel_border : norm_border, 4.0f);
+            ui_draw_panel(&ui_renderer,
+                ui_rect(platform.width - 115, 100, 80, 50),
+                UI_COLOR_SAFE, UI_COLOR_WHITE,
+                planning.speed_choice == SPEED_ACCEL ? sel_border : norm_border, 4.0f);
+        }
+
+        // Phase boxes section
+        ui_draw_panel(&ui_renderer,
+            ui_rect(platform.width - 315, 175, 300, 120),
+            UI_COLOR_BG_DARK, ui_color(0.3f, 0.3f, 0.4f, 1.0f), 1.0f, 4.0f);
+
+        // 5 phase boxes (highlight selected)
+        for (int i = 0; i < 5; i++) {
+            bool selected = (i == planning.selected_phase);
+            UIColor box_color = selected ? UI_COLOR_CAUTION : UI_COLOR_BG_DARK;
+            UIColor border = selected ? UI_COLOR_WHITE : ui_color(0.4f, 0.4f, 0.5f, 1.0f);
+            float border_w = selected ? 2.0f : 1.0f;
+            ui_draw_panel(&ui_renderer,
+                ui_rect(platform.width - 305 + i * 58, 200, 52, 80),
+                box_color, border, border_w, 4.0f);
+        }
+
+        // Bottom status bar
+        ui_draw_panel(&ui_renderer,
+            ui_rect(10, platform.height - 50, platform.width - 340, 40),
+            UI_COLOR_PANEL, UI_COLOR_SELECTED, 1.0f, 4.0f);
+
+        ui_renderer_end(&ui_renderer);
+
+        // Draw text labels
+        if (has_text) {
+            text_renderer_begin(&text_renderer, platform.width, platform.height);
+
+            // Header text
+            text_draw_centered(&text_renderer, "TURN PLANNING",
+                ui_rect(platform.width - 315, 15, 300, 40), UI_COLOR_WHITE);
+
+            // Speed section label with current speed
+            {
+                char speed_text[32];
+                snprintf(speed_text, sizeof(speed_text), "Current: %d mph", planning.current_speed);
+                text_draw(&text_renderer, "SPEED", platform.width - 305, 70, UI_COLOR_WHITE);
+                text_draw(&text_renderer, speed_text, platform.width - 200, 70, UI_COLOR_DISABLED);
+            }
+
+            // Speed button labels
+            text_draw_centered(&text_renderer, "BRAKE",
+                ui_rect(platform.width - 305, 100, 80, 50), UI_COLOR_WHITE);
+            text_draw_centered(&text_renderer, "HOLD",
+                ui_rect(platform.width - 210, 100, 80, 50), UI_COLOR_WHITE);
+            text_draw_centered(&text_renderer, "ACCEL",
+                ui_rect(platform.width - 115, 100, 80, 50), UI_COLOR_WHITE);
+
+            // Phase section label
+            text_draw(&text_renderer, "MANEUVERS", platform.width - 305, 180, UI_COLOR_WHITE);
+
+            // Phase labels
+            const char* phase_labels[] = {"P1", "P2", "P3", "P4", "P5"};
+            for (int i = 0; i < 5; i++) {
+                UIRect box = ui_rect(platform.width - 305 + i * 58, 200, 52, 80);
+                text_draw_centered(&text_renderer, phase_labels[i], box, UI_COLOR_WHITE);
+            }
+
+            // Status bar text with dynamic info
+            {
+                const char* speed_names[] = {"BRAKE", "HOLD", "ACCEL"};
+                const char* team_name = "None";
+                Entity* sel = entity_manager_get_selected(&entities);
+                if (sel) {
+                    team_name = sel->team == TEAM_RED ? "Red" :
+                                sel->team == TEAM_BLUE ? "Blue" : "Other";
+                }
+                char status_text[128];
+                snprintf(status_text, sizeof(status_text),
+                    "Vehicle: %s  |  Speed: %d mph  |  Next: %s  |  Phase: P%d",
+                    team_name, planning.current_speed,
+                    speed_names[planning.speed_choice], planning.selected_phase + 1);
+                text_draw(&text_renderer, status_text, 20, platform.height - 42, UI_COLOR_WHITE);
+            }
+
+            text_renderer_end(&text_renderer);
+        }
+
         // Swap buffers
         platform_swap_buffers(&platform);
     }
 
     // Cleanup
+    if (has_text) text_renderer_destroy(&text_renderer);
+    ui_renderer_destroy(&ui_renderer);
     obj_destroy(&car_mesh);
     box_renderer_destroy(&box_renderer);
     floor_destroy(&arena_floor);
