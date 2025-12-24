@@ -33,17 +33,17 @@ A learning project exploring 3D game engine development in C with OpenGL.
 Requires: CMake 3.16+, SDL2, OpenGL, GLEW
 
 ```bash
-cd arena-editor
+cd arena
 mkdir build && cd build
 cmake ..
 make
-./arena_editor
+./arena
 ```
 
 ### WSL2 with GPU
 
 ```bash
-GALLIUM_DRIVER=d3d12 ./arena_editor
+GALLIUM_DRIVER=d3d12 ./arena
 ```
 
 ## Controls
@@ -60,7 +60,7 @@ GALLIUM_DRIVER=d3d12 ./arena_editor
 ## Project Structure
 
 ```
-arena-editor/     # Main editor application
+arena/            # Combined game and editor
   src/
     platform/     # SDL2 window/input handling
     math/         # Vector and matrix math

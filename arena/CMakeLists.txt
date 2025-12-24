@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(arena_editor C)
+project(arena C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -28,10 +28,10 @@ set(SOURCES
 )
 
 # Executable
-add_executable(arena_editor ${SOURCES})
+add_executable(arena ${SOURCES})
 
 # Include directories
-target_include_directories(arena_editor PRIVATE
+target_include_directories(arena PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${SDL2_INCLUDE_DIRS}
     ${OPENGL_INCLUDE_DIRS}
@@ -39,7 +39,7 @@ target_include_directories(arena_editor PRIVATE
 )
 
 # Link libraries
-target_link_libraries(arena_editor
+target_link_libraries(arena
     ${SDL2_LIBRARIES}
     ${OPENGL_LIBRARIES}
     GLEW::GLEW

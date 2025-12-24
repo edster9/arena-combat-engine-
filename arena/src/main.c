@@ -1,5 +1,7 @@
 /*
- * Arena Editor - Car Wars Level Editor
+ * Arena - Vehicular Combat Game
+ * Combined editor and game - pause to plan, play to execute
+ *
  * Milestone E3: Arena Walls + Obstacles
  * Milestone E4: Placeholder Cars for Scale Testing
  */
@@ -17,7 +19,7 @@
 
 #define WINDOW_WIDTH 1920
 #define WINDOW_HEIGHT 1080
-#define WINDOW_TITLE "Car Wars Arena Editor"
+#define WINDOW_TITLE "Arena"
 
 // Arena dimensions
 #define ARENA_SIZE 60.0f
@@ -148,7 +150,7 @@ int main(int argc, char* argv[]) {
     (void)argc;
     (void)argv;
 
-    printf("=== Car Wars Arena Editor ===\n");
+    printf("=== Arena ===\n");
     printf("Controls:\n");
     printf("  Right-click + drag: Look around\n");
     printf("  WASD: Move\n");
