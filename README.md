@@ -46,20 +46,13 @@ sudo apt update
 sudo apt install build-essential cmake libsdl2-dev libglew-dev libode-dev
 ```
 
-Build:
+Build and run (OS-aware scripts handle WSL2/Linux/Windows):
 
 ```bash
 cd client
-mkdir build && cd build
-cmake ..
-make
-./carwars
-```
-
-For WSL2 with GPU acceleration:
-
-```bash
-GALLIUM_DRIVER=d3d12 ./carwars
+./build.sh        # Build the client
+./run.sh          # Run (auto-detects WSL2 GPU acceleration)
+./run.sh --build  # Build and run in one step
 ```
 
 ### Windows (MSYS2 / MinGW64)
@@ -83,10 +76,9 @@ ln -s /mingw64/lib/libode_double.dll.a /mingw64/lib/libode.dll.a
 ```bash
 git clone git@github.com:your-username/arena-combat-engine.git
 cd arena-combat-engine/client
-mkdir build && cd build
-cmake -G "MinGW Makefiles" ..
-mingw32-make
-./carwars.exe
+./build.sh        # Build (detects MinGW)
+./run.sh          # Run
+./run.sh --build  # Build and run
 ```
 
 ## Controls
