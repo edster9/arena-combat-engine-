@@ -22,31 +22,83 @@ A learning project exploring 3D game engine development in C with OpenGL.
 ## Current Features
 
 - SDL2 window with OpenGL 3.3+ context
-- Fly camera with mouse look and WASD movement
+- Chase camera with smooth follow and mouse orbit
 - Procedural floor grid with distance fog
 - Box renderer with directional lighting
 - Arena walls and obstacles
-- Placeholder vehicles for scale testing
+- ODE physics engine integration with:
+  - Rigid body vehicle dynamics
+  - Per-axle suspension (configurable ERP/CFM)
+  - Friction and slip simulation
+  - Collision detection
+- JSON-based vehicle and scene configuration
+- Ghost path preview for planned maneuvers
+- Debug visualization for physics bodies
 
 ## Building
 
-Requires: CMake 3.16+, SDL2, OpenGL, GLEW
+### Ubuntu / Debian / WSL2
+
+Install dependencies:
 
 ```bash
-cd arena
+sudo apt update
+sudo apt install build-essential cmake libsdl2-dev libglew-dev libode-dev
+```
+
+Build:
+
+```bash
+cd client
 mkdir build && cd build
 cmake ..
 make
-./arena
+./carwars
 ```
 
-### WSL2 with GPU
+For WSL2 with GPU acceleration:
 
 ```bash
-GALLIUM_DRIVER=d3d12 ./arena
+GALLIUM_DRIVER=d3d12 ./carwars
+```
+
+### Windows (MSYS2 / MinGW64)
+
+1. Install [MSYS2](https://www.msys2.org/)
+
+2. Open **MINGW64** terminal (not MSYS2 or UCRT) and install dependencies:
+
+```bash
+pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake mingw-w64-x86_64-SDL2 mingw-w64-x86_64-glew mingw-w64-x86_64-ode git
+```
+
+3. Fix ODE library naming issue (MSYS2 package bug):
+
+```bash
+ln -s /mingw64/lib/libode_double.dll.a /mingw64/lib/libode.dll.a
+```
+
+4. Clone and build:
+
+```bash
+git clone git@github.com:your-username/arena-combat-engine.git
+cd arena-combat-engine/client
+mkdir build && cd build
+cmake -G "MinGW Makefiles" ..
+mingw32-make
+./carwars.exe
 ```
 
 ## Controls
+
+### Driving Mode (Default)
+
+- **W/S**: Accelerate / Brake
+- **A/D**: Steer left / right
+- **Right-click + drag**: Orbit camera around vehicle
+- **Scroll**: Zoom in / out
+
+### Fly Camera Mode
 
 - **Right-click + drag**: Look around
 - **WASD**: Move
@@ -54,20 +106,51 @@ GALLIUM_DRIVER=d3d12 ./arena
 - **Q/Ctrl**: Move down
 - **Shift**: Move faster
 - **Scroll**: Adjust speed
+
+### General
+
+- **Tab**: Toggle between driving and fly camera modes
+- **G**: Toggle ghost path preview
+- **P**: Toggle physics debug visualization
 - **F11**: Toggle fullscreen
 - **ESC**: Quit
 
 ## Project Structure
 
 ```
-arena/            # Combined game and editor
+assets/                 # Shared game assets
+  config/               # JSON vehicle and scene configs
+    vehicles/           # Vehicle definitions
+    scenes/             # Scene/arena definitions
+  fonts/                # TTF fonts
+  models/               # 3D models (OBJ)
+  shaders/              # GLSL shaders
+  textures/             # Texture images
+  audio/                # Sound effects and music
+
+client/                 # Game client (C/OpenGL)
   src/
-    platform/     # SDL2 window/input handling
-    math/         # Vector and matrix math
-    render/       # Shaders, camera, rendering
-assets/           # 3D models, textures (CC0 licensed)
-docs/             # Design documents and notes
+    platform/           # SDL2 window/input handling
+    math/               # Vector and matrix math
+    render/             # Shaders, camera, mesh rendering
+    physics/            # ODE physics integration
+    game/               # Entity system, config loader
+    ui/                 # UI rendering and text
+    vendor/             # Third-party code (cJSON)
+
+server/                 # Game server (Go)
+  cmd/server/           # Server entry point
+  internal/
+    net/                # Client connections, messaging
+    lobby/              # Room management, matchmaking
+    game/               # Game state, turn logic
+
+docs/                   # Design documents and guides
 ```
+
+## Configuration
+
+Vehicle and scene parameters are defined in JSON files under `assets/config/`. See [CONFIG_GUIDE.md](docs/CONFIG_GUIDE.md) for detailed documentation on all configuration options including suspension tuning (ERP/CFM).
 
 ## License
 
@@ -75,7 +158,7 @@ See [LICENSE](LICENSE) for details.
 
 ## Third-Party Assets
 
-- **Kenney Car Kit** - CC0 (Public Domain) - https://kenney.nl/assets/car-kit
+- Vehicle models pending (placeholder rendering currently used)
 
 ## Disclaimer
 
