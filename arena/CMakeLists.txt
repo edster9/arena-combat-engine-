@@ -12,9 +12,24 @@ set(CMAKE_C_FLAGS_RELEASE "-O2")
 # Find required packages
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(SDL2 REQUIRED sdl2)
-pkg_check_modules(ODE REQUIRED ode)
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
+
+# ODE - handle different library names on Linux vs MinGW
+pkg_check_modules(ODE ode)
+if(NOT ODE_FOUND)
+    # MinGW uses ode_double
+    pkg_check_modules(ODE ode-double)
+    if(NOT ODE_FOUND)
+        # Manual fallback for MinGW
+        if(WIN32 OR MINGW)
+            set(ODE_LIBRARIES ode_double)
+            set(ODE_INCLUDE_DIRS "")
+        else()
+            message(FATAL_ERROR "ODE library not found")
+        endif()
+    endif()
+endif()
 
 # Source files
 set(SOURCES
