@@ -3,6 +3,7 @@
  */
 
 #include "config_loader.h"
+#include "equipment_loader.h"
 #include "../vendor/cJSON.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -192,6 +193,69 @@ VehicleJSON config_default_vehicle(void) {
     return v;
 }
 
+// Parsed tire config (from vehicle JSON tires array)
+typedef struct {
+    char id[32];
+    char type[64];
+    char modifiers[4][64];
+    int modifier_count;
+    float radius;
+    float width;
+} ParsedTireConfig;
+
+static ParsedTireConfig s_parsed_tires[16];
+static int s_parsed_tire_count = 0;
+
+// Parse tires array
+static void parse_tires_array(cJSON* tires_arr) {
+    s_parsed_tire_count = 0;
+    cJSON* t;
+    cJSON_ArrayForEach(t, tires_arr) {
+        if (s_parsed_tire_count >= 16) break;
+        ParsedTireConfig* tire = &s_parsed_tires[s_parsed_tire_count];
+
+        json_get_string(t, "id", tire->id, 32, "");
+        json_get_string(t, "type", tire->type, 64, "tire_standard");
+
+        // Parse modifiers array
+        tire->modifier_count = 0;
+        cJSON* mods = cJSON_GetObjectItem(t, "modifiers");
+        if (mods && cJSON_IsArray(mods)) {
+            cJSON* m;
+            cJSON_ArrayForEach(m, mods) {
+                if (tire->modifier_count >= 4) break;
+                if (cJSON_IsString(m)) {
+                    strncpy(tire->modifiers[tire->modifier_count], m->valuestring, 63);
+                    tire->modifiers[tire->modifier_count][63] = '\0';
+                    tire->modifier_count++;
+                }
+            }
+        }
+
+        // Parse size
+        cJSON* size = cJSON_GetObjectItem(t, "size");
+        if (size) {
+            tire->radius = json_get_float(size, "radius", 0.35f);
+            tire->width = json_get_float(size, "width", 0.2f);
+        } else {
+            tire->radius = 0.35f;
+            tire->width = 0.2f;
+        }
+
+        s_parsed_tire_count++;
+    }
+}
+
+// Find parsed tire by ID
+static ParsedTireConfig* find_parsed_tire(const char* id) {
+    for (int i = 0; i < s_parsed_tire_count; i++) {
+        if (strcmp(s_parsed_tires[i].id, id) == 0) {
+            return &s_parsed_tires[i];
+        }
+    }
+    return NULL;
+}
+
 // Parse wheels array (uses defaults.wheel for values not specified)
 static void parse_wheels(cJSON* wheels_arr, VehicleJSON* out) {
     out->wheel_count = 0;
@@ -202,15 +266,29 @@ static void parse_wheels(cJSON* wheels_arr, VehicleJSON* out) {
         WheelDef* wheel = &out->wheels[out->wheel_count];
         json_get_string(w, "id", wheel->id, 16, "W");
         wheel->position = json_array_to_vec3(cJSON_GetObjectItem(w, "position"), vec3(0, 0, 0));
-        // Use defaults.wheel as fallback for unspecified values
-        wheel->radius = json_get_float(w, "radius", out->defaults.wheel.radius);
-        wheel->width = json_get_float(w, "width", out->defaults.wheel.width);
+
+        // Check for tire reference
+        cJSON* tire_ref = cJSON_GetObjectItem(w, "tire");
+        if (tire_ref && cJSON_IsString(tire_ref)) {
+            ParsedTireConfig* tire = find_parsed_tire(tire_ref->valuestring);
+            if (tire) {
+                wheel->radius = tire->radius;
+                wheel->width = tire->width;
+            } else {
+                wheel->radius = out->defaults.wheel.radius;
+                wheel->width = out->defaults.wheel.width;
+            }
+        } else {
+            // Use defaults or direct values
+            wheel->radius = json_get_float(w, "radius", out->defaults.wheel.radius);
+            wheel->width = json_get_float(w, "width", out->defaults.wheel.width);
+        }
         wheel->mass = json_get_float(w, "mass", out->defaults.wheel.mass);
         out->wheel_count++;
     }
 }
 
-// Parse axles array (with per-axle suspension support)
+// Parse axles array (with per-axle suspension/brakes support)
 static void parse_axles(cJSON* axles_arr, VehicleJSON* out) {
     out->axle_count = 0;
     cJSON* a;
@@ -218,22 +296,54 @@ static void parse_axles(cJSON* axles_arr, VehicleJSON* out) {
         if (out->axle_count >= MAX_AXLES) break;
 
         AxleDef* axle = &out->axles[out->axle_count];
-        json_get_string(a, "name", axle->name, MAX_NAME_LENGTH, "axle");
+        // Try "id" first, then "name" for backwards compatibility
+        cJSON* id_item = cJSON_GetObjectItem(a, "id");
+        if (id_item && cJSON_IsString(id_item)) {
+            strncpy(axle->name, id_item->valuestring, MAX_NAME_LENGTH - 1);
+            axle->name[MAX_NAME_LENGTH - 1] = '\0';
+        } else {
+            json_get_string(a, "name", axle->name, MAX_NAME_LENGTH, "axle");
+        }
         axle->steering = json_get_bool(a, "steering", false);
         axle->driven = json_get_bool(a, "driven", false);
         axle->max_steer_angle = json_get_float(a, "max_steer_angle", 0.6f);
 
-        // Parse per-axle suspension (optional - falls back to defaults.suspension)
+        // Parse per-axle suspension (can be string ID or object)
         cJSON* axle_susp = cJSON_GetObjectItem(a, "suspension");
-        if (axle_susp && cJSON_IsObject(axle_susp)) {
+        if (axle_susp && cJSON_IsString(axle_susp)) {
+            // New format: suspension is an equipment ID string
+            const SuspensionEquipment* susp = equipment_find_suspension(axle_susp->valuestring);
+            if (susp) {
+                axle->has_suspension = true;
+                axle->suspension_erp = susp->erp;
+                axle->suspension_cfm = susp->cfm;
+                axle->suspension_travel = susp->travel;
+            } else {
+                fprintf(stderr, "Warning: Suspension '%s' not found, using defaults\n", axle_susp->valuestring);
+                axle->has_suspension = false;
+            }
+        } else if (axle_susp && cJSON_IsObject(axle_susp)) {
+            // Legacy format: suspension is an object with values
             axle->has_suspension = true;
-            // Use defaults.suspension as fallback, override with axle-specific values
             axle->suspension_erp = json_get_float(axle_susp, "erp", out->defaults.suspension.erp);
             axle->suspension_cfm = json_get_float(axle_susp, "cfm", out->defaults.suspension.cfm);
             axle->suspension_travel = json_get_float(axle_susp, "travel", out->defaults.suspension.travel);
         } else {
             axle->has_suspension = false;
-            // Will use defaults.suspension
+        }
+
+        // Parse per-axle brakes (string ID)
+        cJSON* axle_brakes = cJSON_GetObjectItem(a, "brakes");
+        if (axle_brakes && cJSON_IsString(axle_brakes)) {
+            const BrakeEquipment* brk = equipment_find_brake(axle_brakes->valuestring);
+            if (brk) {
+                axle->brake_force_multiplier = brk->brake_force_multiplier;
+            } else {
+                fprintf(stderr, "Warning: Brakes '%s' not found, using default\n", axle_brakes->valuestring);
+                axle->brake_force_multiplier = 8.0f;
+            }
+        } else {
+            axle->brake_force_multiplier = 8.0f;  // Default standard brakes
         }
 
         // Parse wheel IDs array
@@ -284,14 +394,33 @@ bool config_load_vehicle(const char* filepath, VehicleJSON* out) {
 
     json_get_string(root, "name", out->name, MAX_NAME_LENGTH, "default");
 
-    // Chassis (shared between v1 and v2)
+    // Chassis - check for equipment reference (body) or direct values
     cJSON* chassis = cJSON_GetObjectItem(root, "chassis");
     if (chassis) {
-        out->chassis_mass = json_get_float(chassis, "mass", out->chassis_mass);
-        out->chassis_length = json_get_float(chassis, "length", out->chassis_length);
-        out->chassis_width = json_get_float(chassis, "width", out->chassis_width);
-        out->chassis_height = json_get_float(chassis, "height", out->chassis_height);
-        // Also update legacy physics struct
+        cJSON* body_ref = cJSON_GetObjectItem(chassis, "body");
+        if (body_ref && cJSON_IsString(body_ref)) {
+            // New format: look up chassis by ID
+            const ChassisEquipment* chassis_equip = equipment_find_chassis(body_ref->valuestring);
+            if (chassis_equip) {
+                out->chassis_length = chassis_equip->length_default;
+                out->chassis_width = chassis_equip->width_default;
+                out->chassis_height = chassis_equip->height_default;
+                // Calculate mass from weight (Car Wars lbs -> kg)
+                out->chassis_mass = chassis_equip->weight_lbs * LBS_TO_KG;
+                printf("  Chassis: %s (%.1fm x %.1fm x %.1fm, %.0fkg)\n",
+                       chassis_equip->name, out->chassis_length, out->chassis_width,
+                       out->chassis_height, out->chassis_mass);
+            } else {
+                fprintf(stderr, "Warning: Chassis '%s' not found, using defaults\n", body_ref->valuestring);
+            }
+        } else {
+            // Legacy format: direct values
+            out->chassis_mass = json_get_float(chassis, "mass", out->chassis_mass);
+            out->chassis_length = json_get_float(chassis, "length", out->chassis_length);
+            out->chassis_width = json_get_float(chassis, "width", out->chassis_width);
+            out->chassis_height = json_get_float(chassis, "height", out->chassis_height);
+        }
+        // Update legacy physics struct
         out->physics.chassis_mass = out->chassis_mass;
         out->physics.chassis_length = out->chassis_length;
         out->physics.chassis_width = out->chassis_width;
@@ -319,10 +448,27 @@ bool config_load_vehicle(const char* filepath, VehicleJSON* out) {
         }
     }
 
+    // Parse tires array first (needed for wheel parsing)
+    cJSON* tires = cJSON_GetObjectItem(root, "tires");
+    if (tires && cJSON_IsArray(tires)) {
+        parse_tires_array(tires);
+    }
+
     // Parse wheels array
     cJSON* wheels = cJSON_GetObjectItem(root, "wheels");
     if (wheels && cJSON_IsArray(wheels)) {
         parse_wheels(wheels, out);
+    }
+
+    // Debug: print wheel positions
+    printf("  Wheels: %d parsed\n", out->wheel_count);
+    for (int i = 0; i < out->wheel_count; i++) {
+        printf("    %s: (%.2f, %.2f, %.2f) r=%.2f\n",
+               out->wheels[i].id,
+               out->wheels[i].position.x,
+               out->wheels[i].position.y,
+               out->wheels[i].position.z,
+               out->wheels[i].radius);
     }
 
     // Parse axles array
@@ -331,15 +477,84 @@ bool config_load_vehicle(const char* filepath, VehicleJSON* out) {
         parse_axles(axles, out);
     }
 
-    // Parse drivetrain
+    // Calculate tire friction from first tire's equipment
+    if (s_parsed_tire_count > 0) {
+        ParsedTireConfig* first_tire = &s_parsed_tires[0];
+        const char* mod_ids[4];
+        for (int i = 0; i < first_tire->modifier_count; i++) {
+            mod_ids[i] = first_tire->modifiers[i];
+        }
+        TirePhysics tp = equipment_calc_tire_physics(first_tire->type, mod_ids, first_tire->modifier_count);
+        out->defaults.wheel.friction = tp.mu;
+        out->defaults.wheel.slip = tp.slip1;
+        printf("  Tires: %s (mu=%.2f, slip=%.4f)\n", first_tire->type, tp.mu, tp.slip1);
+    }
+
+    // Parse drivetrain - look for axle_power with power_plant references
     cJSON* drivetrain = cJSON_GetObjectItem(root, "drivetrain");
     if (drivetrain) {
-        char dt_type[16];
-        json_get_string(drivetrain, "type", dt_type, 16, "RWD");
-        out->drivetrain.type = parse_drivetrain_type(dt_type);
-        out->drivetrain.motor_force = json_get_float(drivetrain, "motor_force", out->drivetrain.motor_force);
-        out->drivetrain.brake_force = json_get_float(drivetrain, "brake_force", out->drivetrain.brake_force);
-        out->drivetrain.max_speed = json_get_float(drivetrain, "max_speed", out->drivetrain.max_speed);
+        // Check for new axle_power format
+        cJSON* axle_power = cJSON_GetObjectItem(drivetrain, "axle_power");
+        if (axle_power && cJSON_IsArray(axle_power)) {
+            // New format: parse axle_power array for power plant references
+            cJSON* ap;
+            cJSON_ArrayForEach(ap, axle_power) {
+                char axle_id[32] = "";
+                json_get_string(ap, "axle", axle_id, 32, "");
+
+                // Mark axle as driven
+                for (int i = 0; i < out->axle_count; i++) {
+                    if (strcmp(out->axles[i].name, axle_id) == 0) {
+                        out->axles[i].driven = true;
+                    }
+                }
+
+                // Look up power plant
+                cJSON* pp_ref = cJSON_GetObjectItem(ap, "power_plant");
+                if (pp_ref && cJSON_IsString(pp_ref)) {
+                    const PowerPlantEquipment* pp = equipment_find_power_plant(pp_ref->valuestring);
+                    if (pp) {
+                        out->drivetrain.motor_force = pp->motor_force;
+                        // Calculate top speed based on power plant type and estimated weight
+                        float est_weight = out->chassis_mass / LBS_TO_KG;  // Convert back to lbs for formula
+                        out->drivetrain.max_speed = equipment_calc_top_speed_ms(pp->type, pp->power_factors, (int)est_weight);
+                        printf("  Power Plant: %s (%.0fN motor, %.1f m/s max)\n",
+                               pp->name, out->drivetrain.motor_force, out->drivetrain.max_speed);
+                    } else {
+                        fprintf(stderr, "Warning: Power plant '%s' not found\n", pp_ref->valuestring);
+                    }
+                }
+            }
+
+            // Determine drivetrain type from which axles are driven
+            int front_driven = 0, rear_driven = 0;
+            for (int i = 0; i < out->axle_count; i++) {
+                if (out->axles[i].driven) {
+                    if (strcmp(out->axles[i].name, "front") == 0) front_driven = 1;
+                    if (strcmp(out->axles[i].name, "rear") == 0) rear_driven = 1;
+                }
+            }
+            if (front_driven && rear_driven) out->drivetrain.type = DRIVETRAIN_AWD;
+            else if (front_driven) out->drivetrain.type = DRIVETRAIN_FWD;
+            else out->drivetrain.type = DRIVETRAIN_RWD;
+        } else {
+            // Legacy format: direct values
+            char dt_type[16];
+            json_get_string(drivetrain, "type", dt_type, 16, "RWD");
+            out->drivetrain.type = parse_drivetrain_type(dt_type);
+            out->drivetrain.motor_force = json_get_float(drivetrain, "motor_force", out->drivetrain.motor_force);
+            out->drivetrain.brake_force = json_get_float(drivetrain, "brake_force", out->drivetrain.brake_force);
+            out->drivetrain.max_speed = json_get_float(drivetrain, "max_speed", out->drivetrain.max_speed);
+        }
+    }
+
+    // Calculate brake force from axle brake multipliers and chassis mass
+    float total_brake_mult = 0.0f;
+    for (int i = 0; i < out->axle_count; i++) {
+        total_brake_mult += out->axles[i].brake_force_multiplier;
+    }
+    if (total_brake_mult > 0) {
+        out->drivetrain.brake_force = out->chassis_mass * (total_brake_mult / out->axle_count);
     }
 
     // Populate physics struct for ODE
@@ -375,10 +590,13 @@ bool config_load_vehicle(const char* filepath, VehicleJSON* out) {
     }
 
     // Map wheels to per-wheel arrays
+    // Convert from JSON coords (X=forward, Z=left) to physics coords (X=right, Z=forward)
     for (int i = 0; i < out->wheel_count; i++) {
         int idx = wheel_id_to_index(out->wheels[i].id);
         if (idx >= 0 && idx < 4) {
-            out->physics.wheel_positions[idx] = out->wheels[i].position;
+            Vec3 json_pos = out->wheels[i].position;
+            // Transform: physics_x = -json_z, physics_z = json_x
+            out->physics.wheel_positions[idx] = vec3(-json_pos.z, json_pos.y, json_pos.x);
             out->physics.wheel_radii[idx] = out->wheels[i].radius;
             out->physics.wheel_widths[idx] = out->wheels[i].width;
             out->physics.wheel_masses[idx] = out->wheels[i].mass;
@@ -403,6 +621,15 @@ bool config_load_vehicle(const char* filepath, VehicleJSON* out) {
                 }
             }
         }
+    }
+
+    // Debug: print physics wheel positions
+    printf("  Physics wheel positions:\n");
+    for (int i = 0; i < 4; i++) {
+        printf("    [%d]: (%.2f, %.2f, %.2f)\n", i,
+               out->physics.wheel_positions[i].x,
+               out->physics.wheel_positions[i].y,
+               out->physics.wheel_positions[i].z);
     }
 
     // Get max steer angle from steering axle

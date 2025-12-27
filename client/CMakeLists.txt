@@ -45,6 +45,7 @@ set(SOURCES
     src/render/line_render.c
     src/game/entity.c
     src/game/config_loader.c
+    src/game/equipment_loader.c
     src/ui/ui_render.c
     src/ui/ui_text.c
     src/physics/ode_physics.c

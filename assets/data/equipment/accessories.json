@@ -1,0 +1,399 @@
+{
+  "_meta": {
+    "description": "Car Wars vehicle accessories and equipment",
+    "source": "Car Wars Compendium 2nd Edition, Uncle Albert's Catalog"
+  },
+
+  "targeting": {
+    "targeting_computer": {
+      "id": "targeting_computer",
+      "name": "Targeting Computer",
+      "cost": 1000,
+      "weight": 0,
+      "spaces": 0,
+      "to_hit_bonus": 1,
+      "notes": "One per driver/gunner"
+    },
+    "hi_res_computer": {
+      "id": "hi_res_computer",
+      "name": "Hi-Res Targeting Computer",
+      "cost": 3000,
+      "weight": 50,
+      "spaces": 0,
+      "to_hit_bonus": 2,
+      "notes": "One per driver/gunner"
+    },
+    "laser_guidance_link": {
+      "id": "laser_guidance_link",
+      "name": "Laser Guidance Link",
+      "cost": 500,
+      "weight": 25,
+      "spaces": 0,
+      "notes": "Links laser to rockets for guidance"
+    },
+    "fire_control_computer": {
+      "id": "fire_control_computer",
+      "name": "Fire Control Computer",
+      "cost": 5000,
+      "weight": 100,
+      "spaces": 1,
+      "to_hit_bonus": 2,
+      "notes": "Vehicle-wide targeting assistance"
+    },
+    "smart_link": {
+      "id": "smart_link",
+      "name": "Smart Link",
+      "cost": 500,
+      "weight": 0,
+      "spaces": 0,
+      "notes": "Per weapon, allows computer aiming"
+    }
+  },
+
+  "handling": {
+    "spoiler": {
+      "id": "spoiler",
+      "name": "Spoiler",
+      "cost": 500,
+      "weight": 50,
+      "spaces": 0,
+      "hc_bonus": 1,
+      "min_speed": 60,
+      "notes": "+1 HC at 60+ mph"
+    },
+    "airdam": {
+      "id": "airdam",
+      "name": "Airdam",
+      "cost": 500,
+      "weight": 50,
+      "spaces": 0,
+      "hc_bonus": 1,
+      "max_speed": 60,
+      "notes": "+1 HC at under 60 mph"
+    },
+    "spoiler_and_airdam": {
+      "id": "spoiler_airdam",
+      "name": "Spoiler and Airdam",
+      "cost": 1000,
+      "weight": 100,
+      "spaces": 0,
+      "hc_bonus": 1,
+      "notes": "+1 HC at any speed"
+    },
+    "abs_brakes": {
+      "id": "abs_brakes",
+      "name": "Anti-Lock Braking System",
+      "cost": 1000,
+      "weight": 50,
+      "spaces": 0,
+      "deceleration_bonus": 5,
+      "notes": "Allows +5 mph deceleration without hazard"
+    },
+    "hd_brakes": {
+      "id": "hd_brakes",
+      "name": "Heavy-Duty Brakes",
+      "cost": 400,
+      "weight": 100,
+      "spaces": 0,
+      "max_deceleration": 30,
+      "notes": "Allows 30 mph braking"
+    }
+  },
+
+  "turrets": {
+    "turret_1_space": {
+      "id": "turret_1",
+      "name": "1-Space Turret",
+      "cost": 1000,
+      "weight": 100,
+      "spaces": 1,
+      "weapon_spaces": 1,
+      "arc": 360
+    },
+    "turret_2_space": {
+      "id": "turret_2",
+      "name": "2-Space Turret",
+      "cost": 2500,
+      "weight": 150,
+      "spaces": 2,
+      "weapon_spaces": 2,
+      "arc": 360
+    },
+    "turret_3_space": {
+      "id": "turret_3",
+      "name": "3-Space Turret",
+      "cost": 4000,
+      "weight": 200,
+      "spaces": 3,
+      "weapon_spaces": 3,
+      "arc": 360
+    },
+    "cupola": {
+      "id": "cupola",
+      "name": "Cupola",
+      "cost": 1500,
+      "weight": 150,
+      "spaces": 1,
+      "weapon_spaces": 1,
+      "arc": 360,
+      "notes": "Gunner exposed, can use hand weapons"
+    },
+    "universal_turret": {
+      "id": "universal_turret",
+      "name": "Universal Turret",
+      "cost_modifier": 1.5,
+      "notes": "Can fire up/down as well as 360"
+    },
+    "pop_up_turret": {
+      "id": "pop_up_turret",
+      "name": "Pop-Up Turret",
+      "cost_modifier": 1.5,
+      "notes": "Protected by body armor when retracted"
+    },
+    "ewp": {
+      "id": "ewp",
+      "name": "External Weapon Pod",
+      "cost": 200,
+      "weight": 25,
+      "spaces": 0,
+      "weapon_spaces": 1,
+      "dp": 2,
+      "notes": "Exposed mounting, targeted at -3"
+    }
+  },
+
+  "ramplates": {
+    "ramplate": {
+      "id": "ramplate",
+      "name": "Ramplate",
+      "cost_per_point": 25,
+      "weight_per_point": 8,
+      "notes": "Front armor, doubles ram damage to target"
+    },
+    "fake_ramplate": {
+      "id": "fake_ramplate",
+      "name": "Fake Ramplate",
+      "cost": 200,
+      "weight": 50,
+      "notes": "Looks like ramplate, no ram bonus"
+    },
+    "brush_cutter": {
+      "id": "brush_cutter",
+      "name": "Brush Cutter",
+      "cost": 500,
+      "weight": 200,
+      "spaces": 0,
+      "notes": "Negates off-road brush damage"
+    }
+  },
+
+  "safety": {
+    "fire_extinguisher": {
+      "id": "fire_extinguisher",
+      "name": "Fire Extinguisher",
+      "cost": 300,
+      "weight": 150,
+      "spaces": 1,
+      "notes": "Puts out internal fires"
+    },
+    "improved_fire_extinguisher": {
+      "id": "improved_fire_extinguisher",
+      "name": "Improved Fire Extinguisher",
+      "cost": 500,
+      "weight": 200,
+      "spaces": 1,
+      "notes": "More effective fire suppression"
+    },
+    "roll_cage": {
+      "id": "roll_cage",
+      "name": "Roll Cage",
+      "cost": 500,
+      "weight": 100,
+      "spaces": 0,
+      "notes": "Reduces roll damage"
+    },
+    "ejection_seat": {
+      "id": "ejection_seat",
+      "name": "Ejection Seat",
+      "cost": 1000,
+      "weight": 100,
+      "spaces": 0,
+      "notes": "Emergency escape"
+    },
+    "surge_protector": {
+      "id": "surge_protector",
+      "name": "Surge Protector",
+      "cost": 100,
+      "weight": 10,
+      "spaces": 0,
+      "notes": "Protects against EMP"
+    }
+  },
+
+  "electronics": {
+    "radar": {
+      "id": "radar",
+      "name": "Radar",
+      "cost": 2000,
+      "weight": 100,
+      "spaces": 1,
+      "range": 24,
+      "notes": "Detects vehicles in 24\" range"
+    },
+    "radar_detector": {
+      "id": "radar_detector",
+      "name": "Radar Detector",
+      "cost": 100,
+      "weight": 5,
+      "spaces": 0,
+      "notes": "Warns of radar"
+    },
+    "radar_jammer": {
+      "id": "radar_jammer",
+      "name": "Radar Jammer",
+      "cost": 1500,
+      "weight": 75,
+      "spaces": 1,
+      "notes": "Blocks radar detection"
+    },
+    "infrared_sighting": {
+      "id": "irss",
+      "name": "Infrared Sighting System",
+      "cost": 4000,
+      "weight": 100,
+      "spaces": 1,
+      "notes": "Night vision for targeting"
+    },
+    "military_radio": {
+      "id": "military_radio",
+      "name": "Military Radio",
+      "cost": 1000,
+      "weight": 0,
+      "spaces": 0,
+      "notes": "Encrypted communications"
+    },
+    "cb_radio": {
+      "id": "cb_radio",
+      "name": "CB Radio",
+      "cost": 100,
+      "weight": 5,
+      "spaces": 0,
+      "notes": "Standard communications"
+    }
+  },
+
+  "miscellaneous": {
+    "component_armor": {
+      "id": "component_armor",
+      "name": "Component Armor",
+      "cost_per_point": 10,
+      "weight_per_point": 5,
+      "notes": "Protects specific component"
+    },
+    "link": {
+      "id": "link",
+      "name": "Weapon Link",
+      "cost": 50,
+      "weight": 0,
+      "spaces": 0,
+      "notes": "Links weapons for simultaneous fire"
+    },
+    "winch": {
+      "id": "winch",
+      "name": "Winch",
+      "cost": 200,
+      "weight": 100,
+      "spaces": 1,
+      "capacity": 3000,
+      "notes": "3000 lb capacity"
+    },
+    "trailer_hitch": {
+      "id": "trailer_hitch",
+      "name": "Trailer Hitch",
+      "cost": 100,
+      "weight": 50,
+      "spaces": 0,
+      "notes": "Standard trailer connection"
+    },
+    "hvy_trailer_hitch": {
+      "id": "hvy_trailer_hitch",
+      "name": "Heavy Trailer Hitch",
+      "cost": 250,
+      "weight": 100,
+      "spaces": 0,
+      "notes": "For heavy trailers"
+    },
+    "quick_release_hitch": {
+      "id": "quick_release_hitch",
+      "name": "Quick-Release Hitch",
+      "cost": 900,
+      "weight": 50,
+      "spaces": 0,
+      "notes": "Instant trailer release"
+    },
+    "jump_jets": {
+      "id": "jump_jets",
+      "name": "Jump Jets",
+      "cost": 5000,
+      "weight": 500,
+      "spaces": 2,
+      "notes": "Allows vehicle jumping"
+    },
+    "convertible_hardtop": {
+      "id": "convertible_hardtop",
+      "name": "Convertible Hardtop",
+      "cost": 500,
+      "weight": 100,
+      "spaces": 0,
+      "notes": "Retractable roof"
+    },
+    "sunroof": {
+      "id": "sunroof",
+      "name": "Sunroof",
+      "cost": 200,
+      "weight": 25,
+      "spaces": 0,
+      "notes": "Opening in roof"
+    },
+    "sound_system": {
+      "id": "sound_system",
+      "name": "Sound System",
+      "cost": 100,
+      "weight": 25,
+      "spaces": 0,
+      "notes": "Entertainment system"
+    },
+    "anti_theft": {
+      "id": "anti_theft",
+      "name": "Anti-Theft System",
+      "cost": 1000,
+      "weight": 25,
+      "spaces": 0,
+      "notes": "Vehicle security"
+    }
+  },
+
+  "driver": {
+    "driver": {
+      "id": "driver",
+      "name": "Driver",
+      "weight": 150,
+      "spaces": 2,
+      "notes": "Required, 2 spaces for controls"
+    },
+    "gunner": {
+      "id": "gunner",
+      "name": "Gunner",
+      "weight": 150,
+      "spaces": 2,
+      "notes": "Optional, 2 spaces for controls"
+    },
+    "passenger": {
+      "id": "passenger",
+      "name": "Passenger",
+      "weight": 150,
+      "spaces": 1,
+      "notes": "Can use hand weapons"
+    }
+  }
+}

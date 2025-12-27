@@ -1,0 +1,558 @@
+{
+  "_meta": {
+    "description": "Car Wars vehicular weapons",
+    "source": "Car Wars Compendium 2nd Edition, Uncle Albert's Catalog",
+    "units": {
+      "cost": "dollars (weapon only)",
+      "weight": "lbs (loaded)",
+      "damage": "dice notation",
+      "to_hit": "base roll needed"
+    },
+    "effect_types": {
+      "area": "Affects all in area",
+      "burst": "Penetrating damage"
+    }
+  },
+
+  "small_bore_projectile": {
+    "machine_gun": {
+      "id": "mg",
+      "name": "Machine Gun",
+      "abbreviation": "MG",
+      "to_hit": 7,
+      "damage": "1d",
+      "dp": 3,
+      "cost": 1000,
+      "weight": 150,
+      "loaded_weight": 200,
+      "spaces": 1,
+      "ammo_capacity": 20,
+      "ammo_cost": 25,
+      "ammo_weight": 2.5,
+      "magazine_cost": 550,
+      "magazine_weight": 65,
+      "effect": "area"
+    },
+    "vehicular_shotgun": {
+      "id": "vs",
+      "name": "Vehicular Shotgun",
+      "abbreviation": "VS",
+      "to_hit": 6,
+      "damage": "2 hits",
+      "dp": 2,
+      "cost": 950,
+      "weight": 90,
+      "loaded_weight": 100,
+      "spaces": 1,
+      "ammo_capacity": 10,
+      "ammo_cost": 5,
+      "ammo_weight": 1,
+      "magazine_cost": 100,
+      "magazine_weight": 25,
+      "notes": "Full damage to vehicles"
+    },
+    "vulcan_machine_gun": {
+      "id": "vmg",
+      "name": "Vulcan Machine Gun",
+      "abbreviation": "VMG",
+      "to_hit": 6,
+      "damage": "2d",
+      "dp": 3,
+      "cost": 2000,
+      "weight": 350,
+      "loaded_weight": 450,
+      "spaces": 2,
+      "ammo_capacity": 20,
+      "ammo_cost": 35,
+      "ammo_weight": 5,
+      "magazine_cost": 750,
+      "magazine_weight": 115,
+      "effect": "area"
+    },
+    "autocannon": {
+      "id": "ac",
+      "name": "Autocannon",
+      "abbreviation": "AC",
+      "to_hit": 6,
+      "damage": "3d",
+      "dp": 4,
+      "cost": 6500,
+      "weight": 500,
+      "loaded_weight": 600,
+      "spaces": 3,
+      "ammo_capacity": 10,
+      "ammo_cost": 75,
+      "ammo_weight": 10,
+      "magazine_cost": 800,
+      "magazine_weight": 115,
+      "effect": "burst"
+    },
+    "flechette_gun": {
+      "id": "fg",
+      "name": "Flechette Gun",
+      "abbreviation": "FG",
+      "to_hit": 6,
+      "damage": "1d+1",
+      "dp": 2,
+      "cost": 700,
+      "weight": 100,
+      "loaded_weight": 150,
+      "spaces": 1,
+      "ammo_capacity": 20,
+      "ammo_cost": 10,
+      "ammo_weight": 2.5,
+      "magazine_cost": 250,
+      "magazine_weight": 65,
+      "effect": "area",
+      "notes": "No effect on vehicle armor, full effect on pedestrians and tires"
+    },
+    "gauss_gun": {
+      "id": "gg",
+      "name": "Gauss Gun",
+      "abbreviation": "GG",
+      "to_hit": 6,
+      "damage": "3d",
+      "dp": 3,
+      "cost": 10000,
+      "weight": 300,
+      "loaded_weight": 400,
+      "spaces": 2,
+      "ammo_capacity": 10,
+      "ammo_cost": 50,
+      "ammo_weight": 10,
+      "magazine_cost": 550,
+      "magazine_weight": 115,
+      "effect": "area",
+      "power_drain": 0.5,
+      "notes": "Drains 1/2 power unit per shot"
+    },
+    "recoilless_rifle": {
+      "id": "rr",
+      "name": "Recoilless Rifle",
+      "abbreviation": "RR",
+      "to_hit": 7,
+      "damage": "2d",
+      "dp": 4,
+      "cost": 1500,
+      "weight": 300,
+      "loaded_weight": 350,
+      "spaces": 2,
+      "ammo_capacity": 10,
+      "ammo_cost": 35,
+      "ammo_weight": 5,
+      "magazine_cost": 400,
+      "magazine_weight": 65,
+      "effect": "burst"
+    },
+    "heavy_vulcan": {
+      "id": "hvmg",
+      "name": "Heavy Vulcan Machine Gun",
+      "abbreviation": "HVMG",
+      "to_hit": 5,
+      "damage": "3d",
+      "dp": 4,
+      "cost": 4500,
+      "weight": 500,
+      "loaded_weight": 650,
+      "spaces": 3,
+      "ammo_capacity": 20,
+      "ammo_cost": 50,
+      "ammo_weight": 7.5,
+      "magazine_cost": 1050,
+      "magazine_weight": 165,
+      "effect": "area",
+      "notes": "Turret mount only on oversized vehicles"
+    }
+  },
+
+  "large_bore_projectile": {
+    "anti_tank_gun": {
+      "id": "atg",
+      "name": "Anti-Tank Gun",
+      "abbreviation": "ATG",
+      "to_hit": 8,
+      "damage": "3d",
+      "dp": 5,
+      "cost": 2000,
+      "weight": 600,
+      "loaded_weight": 700,
+      "spaces": 3,
+      "ammo_capacity": 10,
+      "ammo_cost": 50,
+      "ammo_weight": 10,
+      "magazine_cost": 550,
+      "magazine_weight": 115,
+      "effect": "burst",
+      "notes": "Cannot be side-mounted except on oversized"
+    },
+    "blast_cannon": {
+      "id": "bc",
+      "name": "Blast Cannon",
+      "abbreviation": "BC",
+      "to_hit": 7,
+      "damage": "4d",
+      "dp": 5,
+      "cost": 4500,
+      "weight": 500,
+      "loaded_weight": 600,
+      "spaces": 4,
+      "ammo_capacity": 10,
+      "ammo_cost": 100,
+      "ammo_weight": 10,
+      "magazine_cost": 1050,
+      "magazine_weight": 115,
+      "effect": "burst"
+    },
+    "tank_gun": {
+      "id": "tg",
+      "name": "Tank Gun",
+      "abbreviation": "TG",
+      "to_hit": 7,
+      "damage": "8d",
+      "dp": 10,
+      "cost": 10000,
+      "weight": 1200,
+      "loaded_weight": 1400,
+      "spaces": 10,
+      "ammo_capacity": 10,
+      "ammo_cost": 100,
+      "ammo_weight": 20,
+      "magazine_cost": 1050,
+      "magazine_weight": 215,
+      "effect": "burst",
+      "notes": "Oversized vehicles only, front or back mount"
+    }
+  },
+
+  "rockets": {
+    "light_rocket": {
+      "id": "ltr",
+      "name": "Light Rocket",
+      "abbreviation": "LtR",
+      "to_hit": 9,
+      "damage": "1d",
+      "dp": 1,
+      "cost": 75,
+      "weight": 25,
+      "spaces": 0.5,
+      "shots": 1,
+      "effect": "burst"
+    },
+    "medium_rocket": {
+      "id": "mr",
+      "name": "Medium Rocket",
+      "abbreviation": "MR",
+      "to_hit": 9,
+      "damage": "2d",
+      "dp": 2,
+      "cost": 140,
+      "weight": 50,
+      "spaces": 1,
+      "shots": 1,
+      "effect": "burst"
+    },
+    "heavy_rocket": {
+      "id": "hr",
+      "name": "Heavy Rocket",
+      "abbreviation": "HR",
+      "to_hit": 9,
+      "damage": "3d",
+      "dp": 2,
+      "cost": 200,
+      "weight": 100,
+      "spaces": 1,
+      "shots": 1,
+      "effect": "burst"
+    },
+    "anti_power_plant_rocket": {
+      "id": "appr",
+      "name": "Anti-Power Plant Rocket",
+      "abbreviation": "APPR",
+      "to_hit": 9,
+      "damage": "1d-1",
+      "dp": 1,
+      "cost": 500,
+      "weight": 40,
+      "spaces": 1,
+      "shots": 1,
+      "effect": "burst",
+      "notes": "Any damage to electric plant causes short-circuit"
+    },
+    "multi_fire_rocket_pod": {
+      "id": "mfr",
+      "name": "Multi-Fire Rocket Pod",
+      "abbreviation": "MFR",
+      "to_hit": 9,
+      "damage": "1d each",
+      "dp": 2,
+      "cost": 750,
+      "weight": 175,
+      "spaces": 2,
+      "rockets": 6,
+      "rockets_per_shot": "1-6",
+      "effect": "burst"
+    },
+    "rocket_launcher": {
+      "id": "rl",
+      "name": "Rocket Launcher",
+      "abbreviation": "RL",
+      "to_hit": 9,
+      "damage": "by rocket",
+      "dp": 3,
+      "cost": 500,
+      "weight": 150,
+      "spaces": 2,
+      "capacity": 10,
+      "notes": "Holds 10 rockets of any single type"
+    }
+  },
+
+  "lasers": {
+    "light_laser": {
+      "id": "ll",
+      "name": "Light Laser",
+      "abbreviation": "LL",
+      "to_hit": 6,
+      "damage": "1d",
+      "dp": 2,
+      "cost": 1500,
+      "weight": 200,
+      "spaces": 1,
+      "power_drain": 1,
+      "notes": "1 power unit per shot"
+    },
+    "laser": {
+      "id": "l",
+      "name": "Laser",
+      "abbreviation": "L",
+      "to_hit": 6,
+      "damage": "2d",
+      "dp": 3,
+      "cost": 4000,
+      "weight": 400,
+      "spaces": 2,
+      "power_drain": 2,
+      "notes": "2 power units per shot"
+    },
+    "heavy_laser": {
+      "id": "hl",
+      "name": "Heavy Laser",
+      "abbreviation": "HL",
+      "to_hit": 6,
+      "damage": "3d",
+      "dp": 4,
+      "cost": 8000,
+      "weight": 600,
+      "spaces": 3,
+      "power_drain": 3,
+      "notes": "3 power units per shot"
+    },
+    "twin_laser": {
+      "id": "twl",
+      "name": "Twin Laser",
+      "abbreviation": "TwL",
+      "to_hit": 6,
+      "damage": "4d",
+      "dp": 6,
+      "cost": 15000,
+      "weight": 1000,
+      "spaces": 4,
+      "power_drain": 3,
+      "notes": "3 power units per shot"
+    },
+    "pulse_laser": {
+      "id": "pul",
+      "name": "Pulse Laser",
+      "abbreviation": "PuL",
+      "to_hit": 5,
+      "damage": "1d",
+      "dp": 2,
+      "cost": 2500,
+      "weight": 300,
+      "spaces": 1,
+      "power_drain": 1,
+      "notes": "Fires 3 pulses, each at +1 to hit"
+    }
+  },
+
+  "flamethrowers": {
+    "flamethrower": {
+      "id": "ft",
+      "name": "Flamethrower",
+      "abbreviation": "FT",
+      "to_hit": 7,
+      "damage": "2d",
+      "dp": 3,
+      "cost": 600,
+      "weight": 150,
+      "loaded_weight": 250,
+      "spaces": 1,
+      "ammo_capacity": 10,
+      "ammo_cost": 50,
+      "ammo_weight": 10,
+      "magazine_cost": 150,
+      "magazine_weight": 115,
+      "fire_modifier": 4,
+      "notes": "+4 to fire modifier on target"
+    },
+    "heavy_flamethrower": {
+      "id": "hft",
+      "name": "Heavy Flamethrower",
+      "abbreviation": "HFT",
+      "to_hit": 7,
+      "damage": "3d",
+      "dp": 4,
+      "cost": 1500,
+      "weight": 350,
+      "loaded_weight": 550,
+      "spaces": 2,
+      "ammo_capacity": 10,
+      "ammo_cost": 100,
+      "ammo_weight": 20,
+      "magazine_cost": 200,
+      "magazine_weight": 215,
+      "fire_modifier": 4,
+      "notes": "+4 to fire modifier"
+    }
+  },
+
+  "dropped_weapons": {
+    "mine_dropper": {
+      "id": "md",
+      "name": "Mine Dropper",
+      "abbreviation": "MD",
+      "dp": 1,
+      "cost": 100,
+      "weight": 25,
+      "spaces": 0,
+      "capacity": 10,
+      "notes": "Holds mines, dropped as firing action"
+    },
+    "spike_dropper": {
+      "id": "sd",
+      "name": "Spike Dropper",
+      "abbreviation": "SD",
+      "dp": 1,
+      "cost": 100,
+      "weight": 25,
+      "spaces": 0,
+      "capacity": 10,
+      "notes": "Drops spikes behind vehicle"
+    },
+    "oil_jet": {
+      "id": "oj",
+      "name": "Oil Jet",
+      "abbreviation": "OJ",
+      "dp": 2,
+      "cost": 200,
+      "weight": 150,
+      "loaded_weight": 250,
+      "spaces": 1,
+      "ammo_capacity": 10,
+      "ammo_cost": 10,
+      "ammo_weight": 10,
+      "notes": "Creates 1\" oil slick"
+    },
+    "smoke_screen": {
+      "id": "ss",
+      "name": "Smoke Screen",
+      "abbreviation": "SS",
+      "dp": 2,
+      "cost": 250,
+      "weight": 150,
+      "loaded_weight": 250,
+      "spaces": 1,
+      "ammo_capacity": 10,
+      "ammo_cost": 10,
+      "ammo_weight": 10,
+      "notes": "Creates 1\" smoke cloud"
+    }
+  },
+
+  "mines": {
+    "standard_mine": {
+      "id": "mine_standard",
+      "name": "Standard Mine",
+      "damage": "1d",
+      "cost": 50,
+      "weight": 5
+    },
+    "spiked_mine": {
+      "id": "mine_spiked",
+      "name": "Spiked Mine",
+      "damage": "1d + spikes",
+      "cost": 75,
+      "weight": 7
+    },
+    "explosive_mine": {
+      "id": "mine_explosive",
+      "name": "Explosive Mine",
+      "damage": "2d",
+      "cost": 200,
+      "weight": 10
+    }
+  },
+
+  "spikes": {
+    "standard_spikes": {
+      "id": "spikes_standard",
+      "name": "Standard Spikes",
+      "damage": "1d per tire",
+      "cost": 10,
+      "weight": 5
+    },
+    "explosive_spikes": {
+      "id": "spikes_explosive",
+      "name": "Explosive Spikes",
+      "damage": "1d + 1d explosion",
+      "cost": 50,
+      "weight": 7
+    }
+  },
+
+  "ammo_types": {
+    "standard": {
+      "id": "ammo_standard",
+      "name": "Standard Ammo",
+      "cost_modifier": 1.0,
+      "damage_modifier": 1.0
+    },
+    "armor_piercing": {
+      "id": "ammo_ap",
+      "name": "Armor-Piercing (AP)",
+      "cost_modifier": 2.0,
+      "damage_modifier": 0.5,
+      "notes": "Half damage but ignores half of metal armor"
+    },
+    "high_explosive": {
+      "id": "ammo_he",
+      "name": "High-Explosive (HE)",
+      "cost_modifier": 1.5,
+      "damage_modifier": 1.5,
+      "effect": "burst",
+      "notes": "50% more damage, burst effect"
+    },
+    "incendiary": {
+      "id": "ammo_incendiary",
+      "name": "Incendiary",
+      "cost_modifier": 2.0,
+      "fire_modifier": 2,
+      "notes": "+2 to fire modifier"
+    },
+    "tracer": {
+      "id": "ammo_tracer",
+      "name": "Tracer",
+      "cost_modifier": 1.25,
+      "to_hit_modifier": 1,
+      "notes": "+1 to hit, reveals shooter location"
+    },
+    "depleted_uranium": {
+      "id": "ammo_du",
+      "name": "Depleted Uranium (DU)",
+      "cost_modifier": 5.0,
+      "weight_modifier": 2.0,
+      "damage_modifier": 1.5,
+      "notes": "50% more damage, double weight"
+    }
+  }
+}

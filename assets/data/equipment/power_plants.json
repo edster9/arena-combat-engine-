@@ -1,0 +1,464 @@
+{
+  "_meta": {
+    "description": "Car Wars power plants - electric and gas engines",
+    "source": "Car Wars Compendium 2nd Edition, Uncle Albert's Catalog",
+    "units": {
+      "cost": "dollars",
+      "weight": "lbs",
+      "spaces": "vehicle spaces",
+      "power_factors": "PF for acceleration calculation"
+    },
+    "acceleration_rules": {
+      "underpowered": "PF < 1/3 weight = won't move",
+      "5_mph": "PF >= 1/3 and < 1/2 weight",
+      "10_mph": "PF >= 1/2 and < weight",
+      "15_mph": "PF >= weight",
+      "20_mph": "PF >= 2x weight (nuclear only)",
+      "25_mph": "PF >= 3x weight (nuclear only)"
+    },
+    "top_speed_formula": {
+      "electric": "360 * PF / (PF + weight)",
+      "gas": "240 * PF / (PF + weight)"
+    },
+    "physics_translation": {
+      "_notes": "Conversion from Car Wars values to physics engine values",
+      "motor_force": "power_factors * 2.5 (Newtons)",
+      "weight_to_mass": "lbs * 0.453592 (kg)",
+      "top_speed_to_velocity": "mph * 0.44704 (m/s)"
+    }
+  },
+
+  "electric": {
+    "small": {
+      "id": "electric_small",
+      "name": "Small Power Plant",
+      "type": "electric",
+      "cost": 500,
+      "weight": 500,
+      "spaces": 3,
+      "dp": 5,
+      "power_factors": 800,
+      "power_units": 400
+    },
+    "medium": {
+      "id": "electric_medium",
+      "name": "Medium Power Plant",
+      "type": "electric",
+      "cost": 1000,
+      "weight": 700,
+      "spaces": 4,
+      "dp": 8,
+      "power_factors": 1400,
+      "power_units": 700
+    },
+    "large": {
+      "id": "electric_large",
+      "name": "Large Power Plant",
+      "type": "electric",
+      "cost": 2000,
+      "weight": 900,
+      "spaces": 5,
+      "dp": 10,
+      "power_factors": 2000,
+      "power_units": 1000
+    },
+    "super": {
+      "id": "electric_super",
+      "name": "Super Power Plant",
+      "type": "electric",
+      "cost": 3000,
+      "weight": 1100,
+      "spaces": 6,
+      "dp": 12,
+      "power_factors": 2600,
+      "power_units": 1300
+    },
+    "sport": {
+      "id": "electric_sport",
+      "name": "Sport Power Plant",
+      "type": "electric",
+      "cost": 6000,
+      "weight": 1000,
+      "spaces": 6,
+      "dp": 12,
+      "power_factors": 3000,
+      "power_units": 1500
+    },
+    "thundercat": {
+      "id": "electric_thundercat",
+      "name": "Thundercat Power Plant",
+      "type": "electric",
+      "cost": 12000,
+      "weight": 2000,
+      "spaces": 8,
+      "dp": 15,
+      "power_factors": 6700,
+      "power_units": 3350
+    },
+    "nuclear": {
+      "id": "nuclear_standard",
+      "name": "Nuclear Power Plant",
+      "type": "nuclear",
+      "cost": 500000,
+      "weight": 2500,
+      "spaces": 14,
+      "dp": 4,
+      "power_factors": 20000,
+      "max_top_speed": 200,
+      "wheel_motor_upgrade_cost": 1000,
+      "notes": "Requires $1000 per wheel for motor upgrades. Special damage rules apply.",
+      "components": ["reactor_core", "heat_exchangers", "generators", "cooling_system"]
+    },
+    "nuclear_truck": {
+      "id": "nuclear_truck",
+      "name": "Nuclear Truck Power Plant",
+      "type": "nuclear",
+      "cost": 1000000,
+      "weight": 6000,
+      "spaces": 20,
+      "dp": 6,
+      "power_factors": 50000,
+      "max_top_speed": 130,
+      "notes": "Better shielding than standard nuclear. Special damage rules apply."
+    }
+  },
+
+  "cycle_electric": {
+    "small_cycle": {
+      "id": "electric_cycle_small",
+      "name": "Small Cycle Power Plant",
+      "type": "electric",
+      "cost": 500,
+      "weight": 100,
+      "spaces": 1,
+      "dp": 2,
+      "power_factors": 400
+    },
+    "medium_cycle": {
+      "id": "electric_cycle_medium",
+      "name": "Medium Cycle Power Plant",
+      "type": "electric",
+      "cost": 1000,
+      "weight": 150,
+      "spaces": 1,
+      "dp": 3,
+      "power_factors": 600
+    },
+    "large_cycle": {
+      "id": "electric_cycle_large",
+      "name": "Large Cycle Power Plant",
+      "type": "electric",
+      "cost": 1500,
+      "weight": 175,
+      "spaces": 2,
+      "dp": 4,
+      "power_factors": 800
+    },
+    "super_cycle": {
+      "id": "electric_cycle_super",
+      "name": "Super Cycle Power Plant",
+      "type": "electric",
+      "cost": 2000,
+      "weight": 200,
+      "spaces": 2,
+      "dp": 5,
+      "power_factors": 1000
+    },
+    "super_trike": {
+      "id": "electric_trike_super",
+      "name": "Super Trike Power Plant",
+      "type": "electric",
+      "cost": 3000,
+      "weight": 250,
+      "spaces": 3,
+      "dp": 6,
+      "power_factors": 1200
+    }
+  },
+
+  "gas_engines": {
+    "10_cid": {
+      "id": "gas_10cid",
+      "name": "10 cid Engine",
+      "type": "gas",
+      "cost": 400,
+      "weight": 60,
+      "spaces": 1,
+      "dp": 1,
+      "power_factors": 300,
+      "mpg": 80
+    },
+    "30_cid": {
+      "id": "gas_30cid",
+      "name": "30 cid Engine",
+      "type": "gas",
+      "cost": 750,
+      "weight": 115,
+      "spaces": 1,
+      "dp": 2,
+      "power_factors": 500,
+      "mpg": 70
+    },
+    "50_cid": {
+      "id": "gas_50cid",
+      "name": "50 cid Engine",
+      "type": "gas",
+      "cost": 1250,
+      "weight": 150,
+      "spaces": 1,
+      "dp": 3,
+      "power_factors": 700,
+      "mpg": 60
+    },
+    "100_cid": {
+      "id": "gas_100cid",
+      "name": "100 cid Engine",
+      "type": "gas",
+      "cost": 2500,
+      "weight": 265,
+      "spaces": 2,
+      "dp": 6,
+      "power_factors": 1300,
+      "mpg": 50
+    },
+    "150_cid": {
+      "id": "gas_150cid",
+      "name": "150 cid Engine",
+      "type": "gas",
+      "cost": 4000,
+      "weight": 375,
+      "spaces": 3,
+      "dp": 9,
+      "power_factors": 1900,
+      "mpg": 45
+    },
+    "200_cid": {
+      "id": "gas_200cid",
+      "name": "200 cid Engine",
+      "type": "gas",
+      "cost": 5500,
+      "weight": 480,
+      "spaces": 4,
+      "dp": 12,
+      "power_factors": 2500,
+      "mpg": 35
+    },
+    "250_cid": {
+      "id": "gas_250cid",
+      "name": "250 cid Engine",
+      "type": "gas",
+      "cost": 6500,
+      "weight": 715,
+      "spaces": 5,
+      "dp": 14,
+      "power_factors": 3200,
+      "mpg": 28
+    },
+    "300_cid": {
+      "id": "gas_300cid",
+      "name": "300 cid Engine",
+      "type": "gas",
+      "cost": 7800,
+      "weight": 825,
+      "spaces": 6,
+      "dp": 16,
+      "power_factors": 4000,
+      "mpg": 22
+    },
+    "350_cid": {
+      "id": "gas_350cid",
+      "name": "350 cid Engine",
+      "type": "gas",
+      "cost": 9500,
+      "weight": 975,
+      "spaces": 7,
+      "dp": 19,
+      "power_factors": 5000,
+      "mpg": 18
+    },
+    "400_cid": {
+      "id": "gas_400cid",
+      "name": "400 cid Engine",
+      "type": "gas",
+      "cost": 10500,
+      "weight": 1050,
+      "spaces": 8,
+      "dp": 22,
+      "power_factors": 6300,
+      "mpg": 15
+    },
+    "450_cid": {
+      "id": "gas_450cid",
+      "name": "450 cid Engine",
+      "type": "gas",
+      "cost": 11700,
+      "weight": 1125,
+      "spaces": 9,
+      "dp": 24,
+      "power_factors": 7800,
+      "mpg": 13
+    },
+    "500_cid": {
+      "id": "gas_500cid",
+      "name": "500 cid Engine",
+      "type": "gas",
+      "cost": 13000,
+      "weight": 1200,
+      "spaces": 10,
+      "dp": 26,
+      "power_factors": 9500,
+      "mpg": 12
+    },
+    "700_cid": {
+      "id": "gas_700cid",
+      "name": "700 cid Engine",
+      "type": "gas",
+      "cost": 19000,
+      "weight": 1275,
+      "spaces": 14,
+      "dp": 30,
+      "power_factors": 13000,
+      "mpg": 10
+    }
+  },
+
+  "power_plant_accessories": {
+    "platinum_catalysts": {
+      "id": "platinum_catalysts",
+      "name": "Platinum Catalysts (PCs)",
+      "type": "electric_only",
+      "cost_modifier": 0.20,
+      "power_factor_modifier": 0.05,
+      "notes": "Increases power factors by 5%, costs 20% of plant cost"
+    },
+    "superconductors": {
+      "id": "superconductors",
+      "name": "Superconductors (SCs)",
+      "type": "electric_only",
+      "cost_modifier": 0.50,
+      "power_factor_modifier": 0.10,
+      "notes": "Increases power factors by 10%, costs 50% of plant cost"
+    },
+    "pc_and_sc_combo": {
+      "id": "pc_and_sc_combo",
+      "name": "PCs and SCs Combined",
+      "type": "electric_only",
+      "cost_modifier": 0.70,
+      "power_factor_modifier": 0.15,
+      "notes": "Combined effect: 15% power factor increase"
+    },
+    "extra_power_cells": {
+      "id": "extra_power_cells",
+      "name": "Extra Power Cells",
+      "type": "electric_only",
+      "cost_modifier": 0.25,
+      "weight_modifier": 0.25,
+      "spaces_modifier": 0.10,
+      "dp_modifier": 0.10,
+      "power_units_modifier": 0.50,
+      "notes": "50% more power units, does not affect power factors"
+    },
+    "improved_supercharger_capacitors": {
+      "id": "isc",
+      "name": "Improved Supercharger Capacitors (ISC)",
+      "type": "electric_only",
+      "cost": 500,
+      "weight": 75,
+      "spaces": 1,
+      "dp_bonus": 1,
+      "effect": "Adds 5 mph acceleration and 20 mph top speed for 3 turns",
+      "recharge_time": "2 minutes",
+      "recharge_cost": 10
+    },
+    "laser_battery": {
+      "id": "laser_battery",
+      "name": "Laser Battery",
+      "type": "accessory",
+      "cost": 2000,
+      "weight": 500,
+      "spaces": 2,
+      "dp": 4,
+      "power_units": 100,
+      "notes": "Dedicated power for lasers"
+    },
+    "carburetor": {
+      "id": "carburetor",
+      "name": "Carburetor",
+      "type": "gas_only",
+      "cost_modifier": -0.25,
+      "notes": "Saves 25% of engine cost, no weight/space"
+    },
+    "fuel_injection": {
+      "id": "fuel_injection",
+      "name": "Fuel Injection",
+      "type": "gas_only",
+      "cost_modifier": 0.10,
+      "mpg_modifier": 0.10,
+      "notes": "Standard on most engines, increases mpg by 10%"
+    },
+    "turbocharger": {
+      "id": "turbocharger",
+      "name": "Turbocharger",
+      "type": "gas_only",
+      "cost_modifier": 0.50,
+      "power_factor_modifier": 0.20,
+      "weight": 0,
+      "spaces": 1,
+      "notes": "Increases power factors by 20%"
+    },
+    "supercharger": {
+      "id": "supercharger",
+      "name": "Supercharger",
+      "type": "gas_only",
+      "cost_modifier": 0.30,
+      "power_factor_modifier": 0.10,
+      "notes": "Increases power factors by 10%"
+    },
+    "tubular_headers": {
+      "id": "tubular_headers",
+      "name": "Tubular Headers",
+      "type": "gas_only",
+      "cost_modifier": 0.20,
+      "power_factor_modifier": 0.05,
+      "notes": "Increases power factors by 5%"
+    },
+    "blueprinting": {
+      "id": "blueprinting",
+      "name": "Blueprinting",
+      "type": "gas_only",
+      "cost_modifier": 0.30,
+      "power_factor_modifier": 0.05,
+      "notes": "Increases power factors by 5%"
+    },
+    "nitrous_oxide": {
+      "id": "nitrous_oxide",
+      "name": "Nitrous Oxide",
+      "type": "gas_only",
+      "cost": 500,
+      "weight": 20,
+      "spaces": 1,
+      "duration": 5,
+      "acceleration_bonus": 5,
+      "top_speed_modifier": 0.50,
+      "notes": "5 second boost, uses 1 gallon of gas"
+    },
+    "hd_transmission": {
+      "id": "hd_transmission",
+      "name": "Heavy-Duty Transmission",
+      "cost": 1000,
+      "weight": 100,
+      "spaces": 0,
+      "notes": "Required for vehicles over 6000 lbs"
+    },
+    "overdrive": {
+      "id": "overdrive",
+      "name": "Overdrive",
+      "cost_per_wheel": 100,
+      "weight": 0,
+      "spaces": 0,
+      "top_speed_modifier": 0.20,
+      "acceleration_modifier": -0.50,
+      "notes": "Adds 20% to top speed, halves acceleration (min 2.5 mph)"
+    }
+  }
+}

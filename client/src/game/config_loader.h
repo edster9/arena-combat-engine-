@@ -46,7 +46,7 @@ typedef struct {
 
 // Axle definition (v2 format)
 typedef struct {
-    char name[MAX_NAME_LENGTH];           // Axle name (e.g., "front", "rear", "middle")
+    char name[MAX_NAME_LENGTH];           // Axle name/id (e.g., "front", "rear", "middle")
     char wheel_ids[MAX_WHEELS_PER_AXLE][16];  // IDs of wheels on this axle
     int wheel_count;                      // Number of wheels on this axle
     bool steering;                        // Can this axle steer?
@@ -57,6 +57,8 @@ typedef struct {
     float suspension_cfm;
     float suspension_travel;
     bool has_suspension;                  // True if axle specifies its own suspension
+    // Per-axle brakes
+    float brake_force_multiplier;         // Brake force = mass * multiplier
 } AxleDef;
 
 // Wheel defaults (v2 format) - values used when wheel doesn't specify its own

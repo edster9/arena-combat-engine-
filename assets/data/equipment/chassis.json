@@ -1,0 +1,501 @@
+{
+  "_meta": {
+    "description": "Car Wars chassis/body types - defines vehicle frame",
+    "source": "Car Wars Compendium 2nd Edition",
+    "units": {
+      "cost": "dollars",
+      "weight": "lbs",
+      "max_load": "lbs",
+      "armor_cost": "dollars per point",
+      "armor_weight": "lbs per point"
+    },
+    "physics_dimensions": {
+      "_notes": "3D physics dimensions in meters. Vehicle model can override within min/max bounds.",
+      "length": "front-to-back",
+      "width": "side-to-side (track)",
+      "height": "ground-to-roof"
+    }
+  },
+
+  "cars": {
+    "subcompact": {
+      "id": "subcompact",
+      "name": "Subcompact",
+      "category": "car",
+      "cost": 300,
+      "weight": 1000,
+      "max_load": 2300,
+      "spaces": 7,
+      "cargo_spaces": 0,
+      "armor_cost": 11,
+      "armor_weight": 5,
+      "counter_length": 1.0,
+      "counter_width": 0.5,
+      "counter_height": 0.25,
+      "base_hc_modifier": 1,
+      "wheels": 4,
+      "can_have_6_wheels": false,
+      "physics": {
+        "length": { "default": 3.8, "min": 3.2, "max": 4.2 },
+        "width":  { "default": 1.6, "min": 1.4, "max": 1.8 },
+        "height": { "default": 1.3, "min": 1.1, "max": 1.5 }
+      }
+    },
+    "compact": {
+      "id": "compact",
+      "name": "Compact",
+      "category": "car",
+      "cost": 400,
+      "weight": 1300,
+      "max_load": 3700,
+      "spaces": 10,
+      "cargo_spaces": 0,
+      "armor_cost": 13,
+      "armor_weight": 6,
+      "counter_length": 1.0,
+      "counter_width": 0.5,
+      "counter_height": 0.25,
+      "base_hc_modifier": 0,
+      "wheels": 4,
+      "can_have_6_wheels": false,
+      "physics": {
+        "length": { "default": 4.2, "min": 3.8, "max": 4.6 },
+        "width":  { "default": 1.7, "min": 1.5, "max": 1.9 },
+        "height": { "default": 1.4, "min": 1.2, "max": 1.5 }
+      }
+    },
+    "mid_sized": {
+      "id": "mid_sized",
+      "name": "Mid-sized",
+      "category": "car",
+      "cost": 600,
+      "weight": 1600,
+      "max_load": 4800,
+      "spaces": 13,
+      "cargo_spaces": 0,
+      "armor_cost": 16,
+      "armor_weight": 8,
+      "counter_length": 1.0,
+      "counter_width": 0.5,
+      "counter_height": 0.375,
+      "base_hc_modifier": 0,
+      "wheels": 4,
+      "can_have_6_wheels": true,
+      "physics": {
+        "length": { "default": 4.6, "min": 4.2, "max": 5.0 },
+        "width":  { "default": 1.8, "min": 1.6, "max": 2.0 },
+        "height": { "default": 1.4, "min": 1.2, "max": 1.6 }
+      }
+    },
+    "sedan": {
+      "id": "sedan",
+      "name": "Sedan",
+      "category": "car",
+      "cost": 700,
+      "weight": 1700,
+      "max_load": 5100,
+      "spaces": 16,
+      "cargo_spaces": 0,
+      "armor_cost": 18,
+      "armor_weight": 9,
+      "counter_length": 1.0,
+      "counter_width": 0.5,
+      "counter_height": 0.375,
+      "base_hc_modifier": 0,
+      "wheels": 4,
+      "can_have_6_wheels": true,
+      "physics": {
+        "length": { "default": 4.8, "min": 4.4, "max": 5.2 },
+        "width":  { "default": 1.85, "min": 1.7, "max": 2.0 },
+        "height": { "default": 1.45, "min": 1.3, "max": 1.6 }
+      }
+    },
+    "luxury": {
+      "id": "luxury",
+      "name": "Luxury",
+      "category": "car",
+      "cost": 800,
+      "weight": 1800,
+      "max_load": 5500,
+      "spaces": 19,
+      "cargo_spaces": 0,
+      "armor_cost": 20,
+      "armor_weight": 10,
+      "counter_length": 1.0,
+      "counter_width": 0.5,
+      "counter_height": 0.375,
+      "base_hc_modifier": 0,
+      "wheels": 4,
+      "can_have_6_wheels": true,
+      "physics": {
+        "length": { "default": 5.2, "min": 4.8, "max": 5.6 },
+        "width":  { "default": 1.9, "min": 1.75, "max": 2.1 },
+        "height": { "default": 1.5, "min": 1.35, "max": 1.6 }
+      }
+    },
+    "station_wagon": {
+      "id": "station_wagon",
+      "name": "Station Wagon",
+      "category": "car",
+      "cost": 800,
+      "weight": 1800,
+      "max_load": 5500,
+      "spaces": 14,
+      "cargo_spaces": 7,
+      "armor_cost": 20,
+      "armor_weight": 10,
+      "counter_length": 1.0,
+      "counter_width": 0.5,
+      "counter_height": 0.375,
+      "base_hc_modifier": 0,
+      "wheels": 4,
+      "can_have_6_wheels": true,
+      "physics": {
+        "length": { "default": 4.9, "min": 4.5, "max": 5.3 },
+        "width":  { "default": 1.85, "min": 1.7, "max": 2.0 },
+        "height": { "default": 1.55, "min": 1.4, "max": 1.7 }
+      }
+    },
+    "pickup": {
+      "id": "pickup",
+      "name": "Pickup",
+      "category": "car",
+      "cost": 900,
+      "weight": 2100,
+      "max_load": 6500,
+      "spaces": 13,
+      "cargo_spaces": 11,
+      "armor_cost": 22,
+      "armor_weight": 11,
+      "counter_length": 1.0,
+      "counter_width": 0.5,
+      "counter_height": 0.5,
+      "base_hc_modifier": 0,
+      "wheels": 4,
+      "can_have_6_wheels": true,
+      "physics": {
+        "length": { "default": 5.5, "min": 5.0, "max": 6.2 },
+        "width":  { "default": 2.0, "min": 1.85, "max": 2.2 },
+        "height": { "default": 1.8, "min": 1.6, "max": 2.0 }
+      },
+      "notes": "HC -1 if over 5500 lbs"
+    },
+    "camper": {
+      "id": "camper",
+      "name": "Camper",
+      "category": "car",
+      "cost": 1400,
+      "weight": 2300,
+      "max_load": 6500,
+      "spaces": 17,
+      "cargo_spaces": 7,
+      "armor_cost": 30,
+      "armor_weight": 14,
+      "counter_length": 1.0,
+      "counter_width": 0.5,
+      "counter_height": 0.5,
+      "base_hc_modifier": 0,
+      "wheels": 4,
+      "can_have_6_wheels": true,
+      "physics": {
+        "length": { "default": 6.0, "min": 5.5, "max": 7.0 },
+        "width":  { "default": 2.1, "min": 1.9, "max": 2.3 },
+        "height": { "default": 2.5, "min": 2.2, "max": 2.8 }
+      }
+    },
+    "van": {
+      "id": "van",
+      "name": "Van",
+      "category": "car",
+      "cost": 1000,
+      "weight": 2000,
+      "max_load": 6000,
+      "spaces": 24,
+      "cargo_spaces": 6,
+      "armor_cost": 30,
+      "armor_weight": 14,
+      "counter_length": 1.0,
+      "counter_width": 0.5,
+      "counter_height": 0.5,
+      "base_hc_modifier": -1,
+      "wheels": 4,
+      "can_have_6_wheels": true,
+      "physics": {
+        "length": { "default": 5.0, "min": 4.5, "max": 5.8 },
+        "width":  { "default": 2.0, "min": 1.85, "max": 2.2 },
+        "height": { "default": 2.0, "min": 1.8, "max": 2.3 }
+      }
+    }
+  },
+
+  "cycles": {
+    "small_cycle": {
+      "id": "small_cycle",
+      "name": "Small Cycle",
+      "category": "cycle",
+      "cost": 200,
+      "weight": 120,
+      "max_load": 800,
+      "spaces": 0,
+      "cargo_spaces": 0,
+      "armor_cost": 0,
+      "armor_weight": 0,
+      "counter_length": 0.5,
+      "counter_width": 0.5,
+      "counter_height": 0.25,
+      "base_hc_modifier": 0,
+      "wheels": 2,
+      "armor_positions": ["front", "back"],
+      "physics": {
+        "length": { "default": 1.8, "min": 1.5, "max": 2.0 },
+        "width":  { "default": 0.6, "min": 0.5, "max": 0.7 },
+        "height": { "default": 1.0, "min": 0.9, "max": 1.1 }
+      }
+    },
+    "medium_cycle": {
+      "id": "medium_cycle",
+      "name": "Medium Cycle",
+      "category": "cycle",
+      "cost": 300,
+      "weight": 180,
+      "max_load": 1100,
+      "spaces": 1,
+      "cargo_spaces": 0,
+      "armor_cost": 0,
+      "armor_weight": 0,
+      "counter_length": 0.5,
+      "counter_width": 0.5,
+      "counter_height": 0.25,
+      "base_hc_modifier": 0,
+      "wheels": 2,
+      "armor_positions": ["front", "back"],
+      "physics": {
+        "length": { "default": 2.0, "min": 1.8, "max": 2.2 },
+        "width":  { "default": 0.65, "min": 0.55, "max": 0.75 },
+        "height": { "default": 1.05, "min": 0.95, "max": 1.15 }
+      }
+    },
+    "large_cycle": {
+      "id": "large_cycle",
+      "name": "Large Cycle",
+      "category": "cycle",
+      "cost": 450,
+      "weight": 220,
+      "max_load": 1400,
+      "spaces": 2,
+      "cargo_spaces": 0,
+      "armor_cost": 0,
+      "armor_weight": 0,
+      "counter_length": 0.5,
+      "counter_width": 0.5,
+      "counter_height": 0.25,
+      "base_hc_modifier": 0,
+      "wheels": 2,
+      "armor_positions": ["front", "back"],
+      "physics": {
+        "length": { "default": 2.2, "min": 2.0, "max": 2.4 },
+        "width":  { "default": 0.7, "min": 0.6, "max": 0.8 },
+        "height": { "default": 1.1, "min": 1.0, "max": 1.2 }
+      }
+    },
+    "super_cycle": {
+      "id": "super_cycle",
+      "name": "Super Cycle",
+      "category": "cycle",
+      "cost": 600,
+      "weight": 260,
+      "max_load": 1700,
+      "spaces": 3,
+      "cargo_spaces": 0,
+      "armor_cost": 0,
+      "armor_weight": 0,
+      "counter_length": 0.5,
+      "counter_width": 0.5,
+      "counter_height": 0.25,
+      "base_hc_modifier": 0,
+      "wheels": 2,
+      "armor_positions": ["front", "back"],
+      "physics": {
+        "length": { "default": 2.4, "min": 2.2, "max": 2.6 },
+        "width":  { "default": 0.75, "min": 0.65, "max": 0.85 },
+        "height": { "default": 1.15, "min": 1.0, "max": 1.25 }
+      }
+    }
+  },
+
+  "trikes": {
+    "light_trike": {
+      "id": "light_trike",
+      "name": "Light Trike",
+      "category": "trike",
+      "cost": 250,
+      "weight": 300,
+      "max_load": 1600,
+      "spaces": 8,
+      "cargo_spaces": 0,
+      "armor_cost": 11,
+      "armor_weight": 5,
+      "counter_length": 0.5,
+      "counter_width": 0.5,
+      "counter_height": 0.25,
+      "base_hc_modifier": 0,
+      "wheels": 3,
+      "can_have_turret": false,
+      "physics": {
+        "length": { "default": 2.6, "min": 2.3, "max": 2.9 },
+        "width":  { "default": 1.4, "min": 1.2, "max": 1.6 },
+        "height": { "default": 1.1, "min": 1.0, "max": 1.3 }
+      }
+    },
+    "medium_trike": {
+      "id": "medium_trike",
+      "name": "Medium Trike",
+      "category": "trike",
+      "cost": 300,
+      "weight": 500,
+      "max_load": 2100,
+      "spaces": 10,
+      "cargo_spaces": 0,
+      "armor_cost": 12,
+      "armor_weight": 6,
+      "counter_length": 0.5,
+      "counter_width": 0.5,
+      "counter_height": 0.25,
+      "base_hc_modifier": 0,
+      "wheels": 3,
+      "max_turret_spaces": 1,
+      "physics": {
+        "length": { "default": 2.8, "min": 2.5, "max": 3.1 },
+        "width":  { "default": 1.5, "min": 1.3, "max": 1.7 },
+        "height": { "default": 1.15, "min": 1.0, "max": 1.3 }
+      }
+    },
+    "heavy_trike": {
+      "id": "heavy_trike",
+      "name": "Heavy Trike",
+      "category": "trike",
+      "cost": 400,
+      "weight": 700,
+      "max_load": 2800,
+      "spaces": 12,
+      "cargo_spaces": 0,
+      "armor_cost": 14,
+      "armor_weight": 7,
+      "counter_length": 0.5,
+      "counter_width": 0.5,
+      "counter_height": 0.25,
+      "base_hc_modifier": 0,
+      "wheels": 3,
+      "max_turret_spaces": 2,
+      "physics": {
+        "length": { "default": 3.0, "min": 2.7, "max": 3.3 },
+        "width":  { "default": 1.6, "min": 1.4, "max": 1.8 },
+        "height": { "default": 1.2, "min": 1.05, "max": 1.35 }
+      }
+    },
+    "xheavy_trike": {
+      "id": "xheavy_trike",
+      "name": "Extra-Heavy Trike",
+      "category": "trike",
+      "cost": 550,
+      "weight": 950,
+      "max_load": 3500,
+      "spaces": 14,
+      "cargo_spaces": 0,
+      "armor_cost": 16,
+      "armor_weight": 8,
+      "counter_length": 0.5,
+      "counter_width": 0.5,
+      "counter_height": 0.25,
+      "base_hc_modifier": 0,
+      "wheels": 3,
+      "max_turret_spaces": 2,
+      "physics": {
+        "length": { "default": 3.2, "min": 2.9, "max": 3.5 },
+        "width":  { "default": 1.7, "min": 1.5, "max": 1.9 },
+        "height": { "default": 1.25, "min": 1.1, "max": 1.4 }
+      }
+    }
+  },
+
+  "chassis_modifiers": {
+    "_notes": "Applied to base body cost. cost_modifier is percentage (0.50 = +50%, -0.20 = -20%)",
+    "light": {
+      "id": "chassis_light",
+      "name": "Light Chassis",
+      "max_load_modifier": -0.10,
+      "cost_modifier": -0.20,
+      "weight_modifier": 0
+    },
+    "standard": {
+      "id": "chassis_standard",
+      "name": "Standard Chassis",
+      "max_load_modifier": 0,
+      "cost_modifier": 0,
+      "weight_modifier": 0
+    },
+    "heavy": {
+      "id": "chassis_heavy",
+      "name": "Heavy Chassis",
+      "max_load_modifier": 0.10,
+      "cost_modifier": 0.50,
+      "weight_modifier": 0
+    },
+    "extra_heavy": {
+      "id": "chassis_extra_heavy",
+      "name": "Extra-Heavy Chassis",
+      "max_load_modifier": 0.20,
+      "cost_modifier": 1.00,
+      "weight_modifier": 0,
+      "notes": "Pickups and vans must have 6 wheels"
+    }
+  },
+
+  "frame_modifiers": {
+    "_notes": "Applied to base body. cost_multiplier and weight_multiplier are multipliers (4.0 = 4x cost)",
+    "standard_frame": {
+      "id": "frame_standard",
+      "name": "Standard Frame",
+      "cost_multiplier": 1.0,
+      "weight_multiplier": 1.0,
+      "collision_damage_multiplier": 1.0
+    },
+    "carbon_aluminum": {
+      "id": "frame_carbon_aluminum",
+      "name": "Carbon-Aluminum Frame",
+      "cost_multiplier": 4.0,
+      "weight_multiplier": 0.5,
+      "collision_damage_multiplier": 2.0,
+      "notes": "Max load unchanged, takes double collision damage"
+    }
+  },
+
+  "body_modifiers": {
+    "_notes": "Optional body modifications. cost_modifier is percentage, cost_flat is fixed dollar amount",
+    "streamlined": {
+      "id": "body_streamlined",
+      "name": "Streamlined",
+      "cost_modifier": 0.50,
+      "weight_modifier": 0,
+      "spaces_modifier": -0.10,
+      "top_speed_modifier": 0.10,
+      "power_consumption_modifier": -0.10
+    },
+    "sloped_armor": {
+      "id": "body_sloped",
+      "name": "Sloped Armor",
+      "cost_modifier": 0,
+      "armor_cost_modifier": 0.10,
+      "spaces_modifier": -0.10,
+      "to_hit_modifier": -1,
+      "notes": "No body cost increase, only armor costs 10% more"
+    },
+    "six_wheel": {
+      "id": "body_six_wheel",
+      "name": "Six-Wheel Chassis",
+      "cost_flat": 100,
+      "extra_wheels": 2,
+      "notes": "Plus cost of 2 extra tires"
+    }
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "_meta": {
+    "description": "Car Wars suspension types with physics engine mapping",
+    "source": "Car Wars Compendium 2nd Edition",
+    "notes": [
+      "Suspension determines base Handling Class (HC)",
+      "Cost is based on percentage of body cost",
+      "Suspension adds no weight and takes no space"
+    ],
+    "physics_values": {
+      "erp": "Error Reduction Parameter (0-1) - higher = stiffer spring",
+      "cfm": "Constraint Force Mixing - lower = stiffer damping",
+      "travel": "Suspension travel in meters"
+    }
+  },
+
+  "types": {
+    "light": {
+      "id": "suspension_light",
+      "name": "Light Suspension",
+      "cost_modifier": 0,
+      "hc_car": 1,
+      "hc_van": 0,
+      "hc_subcompact": 2,
+      "physics": {
+        "erp": 0.5,
+        "cfm": 0.01,
+        "travel": 0.18
+      },
+      "notes": "Standard/default suspension. Soft, more body roll."
+    },
+    "improved": {
+      "id": "suspension_improved",
+      "name": "Improved Suspension",
+      "cost_modifier": 1.00,
+      "hc_car": 2,
+      "hc_van": 1,
+      "hc_subcompact": 3,
+      "physics": {
+        "erp": 0.7,
+        "cfm": 0.005,
+        "travel": 0.12
+      },
+      "notes": "Costs 100% of body cost. Balanced handling."
+    },
+    "heavy": {
+      "id": "suspension_heavy",
+      "name": "Heavy Suspension",
+      "cost_modifier": 1.50,
+      "hc_car": 3,
+      "hc_van": 2,
+      "hc_subcompact": 4,
+      "physics": {
+        "erp": 0.85,
+        "cfm": 0.002,
+        "travel": 0.08
+      },
+      "notes": "Costs 150% of body cost. Stiff, minimal body roll."
+    },
+    "off_road": {
+      "id": "suspension_off_road",
+      "name": "Off-Road Suspension",
+      "cost_modifier": 5.00,
+      "hc_car": 2,
+      "hc_van": 1,
+      "hc_subcompact": 3,
+      "hc_offroad_bonus": 1,
+      "negates_offroad_penalty": true,
+      "physics": {
+        "erp": 0.45,
+        "cfm": 0.015,
+        "travel": 0.30
+      },
+      "notes": "Costs 500% of body cost. Very soft, long travel for rough terrain."
+    }
+  },
+
+  "accessories": {
+    "active_suspension": {
+      "id": "active_suspension",
+      "name": "Active Suspension",
+      "cost": 10000,
+      "weight": 200,
+      "spaces": 1,
+      "hc_bonus": 1,
+      "notes": "Computer-controlled suspension. +1 HC."
+    },
+    "hd_shocks": {
+      "id": "hd_shocks",
+      "name": "Heavy-Duty Shocks",
+      "cost": 400,
+      "weight": 50,
+      "spaces": 0,
+      "jump_damage_reduction": 1,
+      "notes": "Reduces jump landing damage by 1 die"
+    }
+  }
+}

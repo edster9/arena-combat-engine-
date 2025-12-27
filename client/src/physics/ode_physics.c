@@ -101,6 +101,9 @@ bool physics_init(PhysicsWorld* pw) {
     dWorldSetERP(pw->world, 0.8f);
     dWorldSetCFM(pw->world, 1e-5f);
 
+    // More solver iterations = better constraint resolution under high forces
+    dWorldSetQuickStepNumIterations(pw->world, 50);  // Default is 20
+
     // Auto-disable for performance (bodies at rest stop simulating)
     dWorldSetAutoDisableFlag(pw->world, 1);
     dWorldSetAutoDisableLinearThreshold(pw->world, 0.01f);
@@ -233,6 +236,12 @@ void physics_step(PhysicsWorld* pw, float dt) {
         for (int w = 0; w < 4; w++) {
             const dReal* pos = dBodyGetPosition(v->wheels[w]);
             v->wheel_states[w].position = vec3((float)pos[0], (float)pos[1], (float)pos[2]);
+
+            // Get actual wheel body rotation matrix for proper rendering
+            const dReal* rot = dBodyGetRotation(v->wheels[w]);
+            for (int r = 0; r < 12; r++) {
+                v->wheel_states[w].rot_matrix[r] = (float)rot[r];
+            }
 
             // Get steering angle for front wheels
             if (w == WHEEL_FL || w == WHEEL_FR) {
@@ -383,6 +392,14 @@ int physics_create_vehicle(PhysicsWorld* pw, Vec3 position, float rotation_y,
 
         dBodySetPosition(v->wheels[w], wheel_x, wheel_y, wheel_z);
 
+        // Rotate wheel body so its local Z-axis points lateral (matches axis2)
+        // The cylinder is Z-axis aligned, so we need local Z to point sideways
+        // Rotation around Y by (rotation_y - PI/2) aligns Z with the lateral direction
+        dMatrix3 wheel_rot;
+        float wheel_angle = rotation_y - 1.5707963f;  // rotation_y - PI/2
+        dRFromAxisAndAngle(wheel_rot, 0, 1, 0, wheel_angle);
+        dBodySetRotation(v->wheels[w], wheel_rot);
+
         // Wheel mass (cylinder) - use per-wheel values
         dMass wheel_mass;
         dMassSetCylinderTotal(&wheel_mass, wheel_masses[w],
@@ -444,6 +461,11 @@ int physics_create_vehicle(PhysicsWorld* pw, Vec3 position, float rotation_y,
                 dJointSetHinge2Param(v->suspensions[w], dParamHiStop, 0);
             }
         }
+
+        // Make steering limits VERY stiff - wheels cannot rotate past limits
+        // High ERP (close to 1) = hard stops, Low CFM = no softness
+        dJointSetHinge2Param(v->suspensions[w], dParamStopERP, 0.99f);
+        dJointSetHinge2Param(v->suspensions[w], dParamStopCFM, 1e-8f);
     }
 
     // Initialize wheel states for rendering

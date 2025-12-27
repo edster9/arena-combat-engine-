@@ -1,0 +1,229 @@
+{
+  "_meta": {
+    "description": "Car Wars tires - base types and modifications with physics engine values",
+    "source": "Car Wars Compendium 2nd Edition, Uncle Albert's Catalog",
+    "units": {
+      "cost": "dollars per tire",
+      "weight": "lbs per tire",
+      "dp": "damage points"
+    },
+    "notes": [
+      "Front tires must match, rear tires must match",
+      "HC drops by 1 if front/rear don't match same type",
+      "Cycle tires cost same but weigh half as much"
+    ],
+    "physics_values": {
+      "_notes": "Physics traction values - internal tuning, not part of CW car building",
+      "mu": "Friction coefficient (0-3+) - higher = more grip",
+      "slip1": "Lateral slip - sideways sliding resistance",
+      "slip2": "Longitudinal slip - acceleration/braking traction"
+    }
+  },
+
+  "base_types": {
+    "standard": {
+      "id": "tire_standard",
+      "name": "Standard Tire",
+      "cost": 50,
+      "weight": 30,
+      "dp": 4,
+      "spike_damage_modifier": 1.0,
+      "debris_damage_modifier": 1.0,
+      "physics": {
+        "mu": 1.5,
+        "slip1": 0.001,
+        "slip2": 0.001
+      }
+    },
+    "heavy_duty": {
+      "id": "tire_heavy_duty",
+      "name": "Heavy-Duty Tire",
+      "cost": 100,
+      "weight": 40,
+      "dp": 6,
+      "spike_damage_modifier": 1.0,
+      "debris_damage_modifier": 1.0,
+      "physics": {
+        "mu": 1.5,
+        "slip1": 0.001,
+        "slip2": 0.001
+      }
+    },
+    "puncture_resistant": {
+      "id": "tire_puncture_resistant",
+      "name": "Puncture-Resistant Tire",
+      "cost": 200,
+      "weight": 50,
+      "dp": 9,
+      "spike_damage_modifier": 1.0,
+      "debris_damage_modifier": 1.0,
+      "physics": {
+        "mu": 1.4,
+        "slip1": 0.001,
+        "slip2": 0.001
+      }
+    },
+    "solid": {
+      "id": "tire_solid",
+      "name": "Solid Tire",
+      "cost": 500,
+      "weight": 75,
+      "dp": 12,
+      "spike_damage_modifier": 0.5,
+      "debris_damage_modifier": 0.0,
+      "physics": {
+        "mu": 1.2,
+        "slip1": 0.002,
+        "slip2": 0.002
+      },
+      "notes": "Half damage from spikes, immune to debris"
+    },
+    "plasticore": {
+      "id": "tire_plasticore",
+      "name": "Plasticore Tire",
+      "cost": 1000,
+      "weight": 150,
+      "dp": 25,
+      "spike_damage_modifier": 0.5,
+      "debris_damage_modifier": 1.0,
+      "core_dp": 21,
+      "physics": {
+        "mu": 1.3,
+        "slip1": 0.0015,
+        "slip2": 0.0015
+      },
+      "notes": "After 4 DP damage, rubber strips off exposing core. HC drops by 1 when any tire exposed. Cannot be radial or off-road. Cannot be steelbelted."
+    }
+  },
+
+  "modifiers": {
+    "steelbelted": {
+      "id": "mod_steelbelted",
+      "name": "Steelbelted",
+      "cost_modifier": 0.50,
+      "weight_modifier": 0.50,
+      "dp_modifier": 0.25,
+      "compatible_with": ["standard", "heavy_duty", "puncture_resistant", "solid"],
+      "notes": "Increases cost and weight by 50%, DP by 25% (round down)"
+    },
+    "radial": {
+      "id": "mod_radial",
+      "name": "Radial",
+      "cost_modifier": 1.50,
+      "weight_modifier": 0.20,
+      "dp_modifier": -1,
+      "hc_bonus": 1,
+      "physics_modifier": {
+        "mu_bonus": 0.1,
+        "slip1_modifier": 0.9,
+        "slip2_modifier": 0.9
+      },
+      "compatible_with": ["standard", "heavy_duty", "puncture_resistant", "solid"],
+      "notes": "Must be on all wheels for HC bonus. Applied after steelbelting."
+    },
+    "off_road": {
+      "id": "mod_off_road",
+      "name": "Off-Road (OR)",
+      "cost_modifier": 0.20,
+      "weight_bonus": 5,
+      "hc_bonus_offroad": 1,
+      "no_terrain_damage": true,
+      "physics_modifier": {
+        "mu_bonus": -0.2,
+        "slip1_modifier": 1.5,
+        "slip2_modifier": 1.2
+      },
+      "compatible_with": ["standard", "heavy_duty", "puncture_resistant", "solid"],
+      "notes": "Must be on all wheels. No bonus on highway. Cannot combine with radial. Less grip on pavement."
+    },
+    "racing_slick": {
+      "id": "mod_racing_slick",
+      "name": "Racing Slick",
+      "cost_modifier": 3.00,
+      "weight_modifier": 1.00,
+      "dp_modifier": 1,
+      "hc_bonus": 2,
+      "hc_bonus_partial": 1,
+      "oil_ice_water_hazard": 3,
+      "oil_ice_water_maneuver_penalty": 4,
+      "spike_damage_modifier": 2.0,
+      "debris_damage_modifier": 2.0,
+      "road_wear_damage": 1,
+      "road_wear_interval_minutes": 10,
+      "physics_modifier": {
+        "mu_bonus": 0.5,
+        "slip1_modifier": 0.7,
+        "slip2_modifier": 0.8
+      },
+      "compatible_with": ["standard", "heavy_duty", "puncture_resistant", "solid"],
+      "notes": "HC +2 if on all wheels, +1 if front or back only. D3 hazard just hitting oil/ice/water. Takes double damage from spikes/debris. 1 DP per 10 min on regular roads. Best dry grip."
+    },
+    "fireproof": {
+      "id": "mod_fireproof",
+      "name": "Fireproof",
+      "cost_modifier": 1.00,
+      "compatible_with": ["standard", "heavy_duty", "puncture_resistant", "solid", "plasticore"],
+      "notes": "Doubles cost, applied after all other mods"
+    }
+  },
+
+  "cycle_tires": {
+    "notes": "Cycle tires cost the same but weigh half as much",
+    "weight_modifier": 0.5
+  },
+
+  "spare_tire": {
+    "spaces": 1,
+    "notes": "Must match vehicle size class. Luxury/Station Wagon share size. Van/Camper/Pickup share size."
+  },
+
+  "wheelguards": {
+    "car_wheelguard": {
+      "id": "wheelguard_car",
+      "name": "Wheelguard (Car)",
+      "cost_per_point": 10,
+      "weight_per_point": 2,
+      "max_dp": 20,
+      "protection_roll": "1-5 on 1d6",
+      "hc_penalty": 0,
+      "notes": "Protects tire on roll of 1-5. One per tire."
+    },
+    "cycle_wheelguard": {
+      "id": "wheelguard_cycle",
+      "name": "Wheelguard (Cycle)",
+      "cost_per_point": 10,
+      "weight_per_point": 2,
+      "max_dp": 20,
+      "protection_roll": "1-5 on 1d6",
+      "hc_penalty": 0,
+      "notes": "Same as car wheelguard"
+    },
+    "hub": {
+      "id": "hub_armor",
+      "name": "Armored Hub",
+      "cost_per_point": 15,
+      "weight_per_point": 3,
+      "max_dp": 15,
+      "notes": "Protects the wheel hub/axle"
+    },
+    "retractable_wheelguard": {
+      "id": "wheelguard_retractable",
+      "name": "Retractable Wheelguard",
+      "cost_modifier": 2.0,
+      "retraction_time": "1 firing action",
+      "notes": "Can be retracted during combat. Costs double normal wheelguard."
+    }
+  },
+
+  "tire_chains": {
+    "id": "tire_chains",
+    "name": "Tire Chains",
+    "cost": 50,
+    "weight": 10,
+    "spaces": 0,
+    "ice_hazard_reduction": 2,
+    "max_speed_with_chains": 40,
+    "install_time": "1 minute per tire",
+    "notes": "Reduces ice hazard by D2, max speed 40 mph when installed"
+  }
+}

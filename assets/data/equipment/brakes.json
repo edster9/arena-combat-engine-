@@ -1,0 +1,80 @@
+{
+  "_meta": {
+    "description": "Brake systems for vehicles",
+    "notes": "Car Wars doesn't have explicit brake equipment, but handling class affects control. We add brakes for physics simulation.",
+    "physics_translation": {
+      "brake_force_formula": "base_force * vehicle_mass_kg",
+      "units": {
+        "brake_force_multiplier": "multiplied by vehicle mass to get Newtons"
+      }
+    }
+  },
+
+  "types": {
+    "standard": {
+      "id": "brakes_standard",
+      "name": "Standard Brakes",
+      "cost": 0,
+      "weight": 0,
+      "spaces": 0,
+      "physics": {
+        "brake_force_multiplier": 8.0
+      },
+      "notes": "Included with chassis"
+    },
+    "heavy_duty": {
+      "id": "brakes_heavy_duty",
+      "name": "Heavy-Duty Brakes",
+      "cost": 400,
+      "weight": 50,
+      "spaces": 0,
+      "physics": {
+        "brake_force_multiplier": 12.0
+      },
+      "notes": "Better stopping power for heavier vehicles"
+    },
+    "performance": {
+      "id": "brakes_performance",
+      "name": "Performance Brakes",
+      "cost": 800,
+      "weight": 30,
+      "spaces": 0,
+      "physics": {
+        "brake_force_multiplier": 15.0
+      },
+      "notes": "Racing-grade brakes for quick stops"
+    },
+    "carbon_ceramic": {
+      "id": "brakes_carbon_ceramic",
+      "name": "Carbon Ceramic Brakes",
+      "cost": 2000,
+      "weight": 20,
+      "spaces": 0,
+      "physics": {
+        "brake_force_multiplier": 18.0
+      },
+      "notes": "Lightweight high-performance brakes, resist fade"
+    }
+  },
+
+  "modifiers": {
+    "antilock": {
+      "id": "brakes_mod_antilock",
+      "name": "Anti-Lock Braking System (ABS)",
+      "cost": 500,
+      "weight": 10,
+      "handling_bonus": 1,
+      "notes": "Prevents wheel lockup, improves control during hard braking"
+    },
+    "brake_booster": {
+      "id": "brakes_mod_booster",
+      "name": "Brake Booster",
+      "cost": 300,
+      "weight": 15,
+      "physics": {
+        "brake_force_modifier": 1.2
+      },
+      "notes": "20% more braking force"
+    }
+  }
+}

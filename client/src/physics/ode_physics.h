@@ -81,6 +81,7 @@ typedef struct {
     float rotation;          // Wheel spin angle
     float steer_angle;       // Current steering angle (front wheels)
     float suspension_compression; // 0 = fully extended, 1 = fully compressed
+    float rot_matrix[12];    // ODE rotation matrix (3x4, column-major)
 } WheelState;
 
 // Physics vehicle handle

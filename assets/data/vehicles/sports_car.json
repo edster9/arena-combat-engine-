@@ -1,0 +1,55 @@
+{
+  "name": "Sports Car",
+  "description": "Mid-sized dueling vehicle with balanced performance",
+  "class": "wheeled",
+
+  "chassis": {
+    "body": "mid_sized",
+    "modifier": "chassis_standard",
+    "frame": "frame_standard"
+  },
+
+  "wheels": [
+    { "id": "FL", "position": [1.4, -1.25, 1.3], "tire": "front_tires" },
+    { "id": "FR", "position": [1.4, -1.25, -1.3], "tire": "front_tires" },
+    { "id": "RL", "position": [-1.3, -1.25, 1.3], "tire": "rear_tires" },
+    { "id": "RR", "position": [-1.3, -1.25, -1.3], "tire": "rear_tires" }
+  ],
+
+  "tires": [
+    {
+      "id": "front_tires",
+      "type": "tire_standard",
+      "modifiers": ["mod_radial"],
+      "size": { "radius": 0.35, "width": 0.2 }
+    },
+    {
+      "id": "rear_tires",
+      "type": "tire_standard",
+      "modifiers": ["mod_radial"],
+      "size": { "radius": 0.35, "width": 0.2 }
+    }
+  ],
+
+  "axles": [
+    {
+      "id": "front",
+      "wheels": ["FL", "FR"],
+      "suspension": "suspension_improved",
+      "steering": true,
+      "max_steer_angle": 0.5
+    },
+    {
+      "id": "rear",
+      "wheels": ["RL", "RR"],
+      "suspension": "suspension_improved",
+      "steering": false
+    }
+  ],
+
+  "drivetrain": {
+    "axle_power": [
+      { "axle": "rear", "power_plant": "electric_large" }
+    ]
+  }
+}

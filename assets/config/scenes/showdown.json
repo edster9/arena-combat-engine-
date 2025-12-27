@@ -1,66 +1,70 @@
 {
-    "name": "showdown",
-    "arena": {
-        "size": 60.0,
-        "wall_height": 4.0,
-        "wall_thickness": 1.0,
-        "ground_y": 0.0
+  "name": "Showdown Arena",
+
+  "arena": {
+    "size": 60.0,
+    "wall_height": 4.0,
+    "wall_thickness": 1.0,
+    "ground_y": 0.0
+  },
+
+  "world": {
+    "gravity": -9.81,
+    "erp": 0.8,
+    "cfm": 0.00001,
+    "contact": {
+      "friction": 1.0,
+      "slip": 0.0001,
+      "soft_erp": 0.9,
+      "soft_cfm": 0.0001
+    }
+  },
+
+  "vehicles": [
+    {
+      "type": "sports_car",
+      "team": "red",
+      "position": [0, 0, -26],
+      "rotation": 0.0
     },
-    "world": {
-        "gravity": -9.81,
-        "erp": 0.8,
-        "cfm": 0.00001,
-        "contact": {
-            "friction": 3.0,
-            "slip": 0.0001,
-            "soft_erp": 0.8,
-            "soft_cfm": 0.0001
-        }
+    {
+      "type": "sports_car",
+      "team": "blue",
+      "position": [0, 0, 26],
+      "rotation": 3.14159
+    }
+  ],
+
+  "obstacles": [
+    {
+      "type": "box",
+      "position": [0, 2.0, 0],
+      "size": [5, 4, 5],
+      "color": [0.6, 0.35, 0.25]
     },
-    "vehicles": [
-        {
-            "type": "sports_car",
-            "team": "red",
-            "position": [0, 0, -26],
-            "rotation": 0.0
-        },
-        {
-            "type": "sports_car",
-            "team": "blue",
-            "position": [0, 0, 26],
-            "rotation": 3.14159
-        }
-    ],
-    "obstacles": [
-        {
-            "type": "box",
-            "position": [0, 2.0, 0],
-            "size": [5, 4, 5],
-            "color": [0.6, 0.35, 0.25]
-        },
-        {
-            "type": "box",
-            "position": [22, 2.0, 22],
-            "size": [3, 4, 3],
-            "color": [0.4, 0.4, 0.45]
-        },
-        {
-            "type": "box",
-            "position": [-22, 2.0, 22],
-            "size": [3, 4, 3],
-            "color": [0.4, 0.4, 0.45]
-        },
-        {
-            "type": "box",
-            "position": [22, 2.0, -22],
-            "size": [3, 4, 3],
-            "color": [0.4, 0.4, 0.45]
-        },
-        {
-            "type": "box",
-            "position": [-22, 2.0, -22],
-            "size": [3, 4, 3],
-            "color": [0.4, 0.4, 0.45]
-        }
-    ]
+    {
+      "type": "box",
+      "position": [22, 2.0, 22],
+      "size": [3, 4, 3],
+      "color": [0.4, 0.4, 0.45]
+    },
+    {
+      "type": "box",
+      "position": [-22, 2.0, 22],
+      "size": [3, 4, 3],
+      "color": [0.4, 0.4, 0.45]
+    },
+    {
+      "type": "box",
+      "position": [22, 2.0, -22],
+      "size": [3, 4, 3],
+      "color": [0.4, 0.4, 0.45]
+    },
+    {
+      "type": "box",
+      "position": [-22, 2.0, -22],
+      "size": [3, 4, 3],
+      "color": [0.4, 0.4, 0.45]
+    }
+  ]
 }

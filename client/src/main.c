@@ -20,6 +20,7 @@
 #include "ui/ui_text.h"
 #include "physics/ode_physics.h"
 #include "game/config_loader.h"
+#include "game/equipment_loader.h"
 
 #include <GL/glew.h>
 #include <stdio.h>
@@ -32,8 +33,8 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-#define WINDOW_WIDTH 1920
-#define WINDOW_HEIGHT 1080
+#define WINDOW_WIDTH 1280
+#define WINDOW_HEIGHT 720
 #define WINDOW_TITLE "Arena"
 
 // Arena dimensions
@@ -188,16 +189,13 @@ static void draw_physics_vehicles(BoxRenderer* r, PhysicsWorld* pw, int selected
 }
 
 // Draw wheels with rotating spokes (batched - efficient)
+// Uses actual ODE wheel body orientation for correct display during rollovers
 static void draw_vehicle_wheels(LineRenderer* lr, PhysicsWorld* pw) {
     Vec3 rim_color = vec3(0.3f, 0.3f, 0.35f);     // Dark grey rim
     Vec3 spoke_color = vec3(0.8f, 0.8f, 0.8f);    // Light grey spokes
 
     for (int i = 0; i < pw->vehicle_count; i++) {
         if (!pw->vehicles[i].active) continue;
-
-        float rot_matrix[9];
-        physics_vehicle_get_rotation_matrix(pw, i, rot_matrix);
-        float chassis_yaw = atan2f(rot_matrix[2], rot_matrix[0]);
 
         VehicleConfig* cfg = &pw->vehicles[i].config;
         WheelState wheels[4];
@@ -207,39 +205,52 @@ static void draw_vehicle_wheels(LineRenderer* lr, PhysicsWorld* pw) {
             Vec3 center = wheels[w].position;
             float radius = cfg->use_per_wheel_config ? cfg->wheel_radii[w] : cfg->wheel_radius;
             float spin = wheels[w].rotation;
-            float steer = wheels[w].steer_angle;
 
-            // Wheel orientation
-            float total_yaw = chassis_yaw + steer;
-            float fwd_x = sinf(total_yaw);
-            float fwd_z = cosf(total_yaw);
+            // Get wheel orientation from ODE rotation matrix
+            // ODE 3x4 matrix: columns are X, Y, Z axes in world space
+            // Wheel cylinder is Z-aligned, so rim is in X-Y plane
+            float* rot = wheels[w].rot_matrix;
 
-            // Draw rim circle
+            // Local X axis (in world coords) - used for rim circle
+            Vec3 axis_x = vec3(rot[0], rot[4], rot[8]);
+            // Local Y axis (in world coords) - used for rim circle
+            Vec3 axis_y = vec3(rot[1], rot[5], rot[9]);
+
+            // Draw rim circle in wheel's X-Y plane
             const int RIM_SEGMENTS = 12;
             for (int s = 0; s < RIM_SEGMENTS; s++) {
                 float a1 = (float)s / RIM_SEGMENTS * 2.0f * (float)M_PI;
                 float a2 = (float)(s + 1) / RIM_SEGMENTS * 2.0f * (float)M_PI;
 
-                float y1 = sinf(a1) * radius;
-                float f1 = cosf(a1) * radius;
-                float y2 = sinf(a2) * radius;
-                float f2 = cosf(a2) * radius;
+                // Points on rim circle using local X and Y axes
+                float cos_a1 = cosf(a1) * radius;
+                float sin_a1 = sinf(a1) * radius;
+                float cos_a2 = cosf(a2) * radius;
+                float sin_a2 = sinf(a2) * radius;
 
-                Vec3 p1 = vec3(center.x + fwd_x * f1, center.y + y1, center.z + fwd_z * f1);
-                Vec3 p2 = vec3(center.x + fwd_x * f2, center.y + y2, center.z + fwd_z * f2);
+                Vec3 p1 = vec3(
+                    center.x + axis_x.x * cos_a1 + axis_y.x * sin_a1,
+                    center.y + axis_x.y * cos_a1 + axis_y.y * sin_a1,
+                    center.z + axis_x.z * cos_a1 + axis_y.z * sin_a1
+                );
+                Vec3 p2 = vec3(
+                    center.x + axis_x.x * cos_a2 + axis_y.x * sin_a2,
+                    center.y + axis_x.y * cos_a2 + axis_y.y * sin_a2,
+                    center.z + axis_x.z * cos_a2 + axis_y.z * sin_a2
+                );
                 line_renderer_draw_line(lr, p1, p2, rim_color, 1.0f);
             }
 
             // Draw 4 rotating spokes
             for (int s = 0; s < 4; s++) {
                 float spoke_angle = spin + (float)s * (float)M_PI * 0.5f;
-                float spoke_y = sinf(spoke_angle) * radius * 0.85f;
-                float spoke_f = cosf(spoke_angle) * radius * 0.85f;
+                float spoke_cos = cosf(spoke_angle) * radius * 0.85f;
+                float spoke_sin = sinf(spoke_angle) * radius * 0.85f;
 
                 Vec3 spoke_end = vec3(
-                    center.x + fwd_x * spoke_f,
-                    center.y + spoke_y,
-                    center.z + fwd_z * spoke_f
+                    center.x + axis_x.x * spoke_cos + axis_y.x * spoke_sin,
+                    center.y + axis_x.y * spoke_cos + axis_y.y * spoke_sin,
+                    center.z + axis_x.z * spoke_cos + axis_y.z * spoke_sin
                 );
                 line_renderer_draw_line(lr, center, spoke_end, spoke_color, 1.0f);
             }
@@ -327,6 +338,11 @@ int main(int argc, char* argv[]) {
         printf("Warning: Could not load car model, using placeholders\n");
     }
 
+    // Load equipment data (required for vehicle config parsing)
+    if (!equipment_load_all("../../assets/data/equipment")) {
+        fprintf(stderr, "Warning: Equipment data not loaded - using defaults\n");
+    }
+
     // Load JSON configs - these are required for correct physics
     SceneJSON scene_config;
     VehicleJSON vehicle_config;
@@ -335,7 +351,7 @@ int main(int argc, char* argv[]) {
     if (!config_load_scene("../../assets/config/scenes/showdown.json", &scene_config)) {
         configs_ok = false;
     }
-    if (!config_load_vehicle("../../assets/config/vehicles/sports_car.json", &vehicle_config)) {
+    if (!config_load_vehicle("../../assets/data/vehicles/sports_car.json", &vehicle_config)) {
         configs_ok = false;
     }
 
@@ -431,7 +447,7 @@ int main(int argc, char* argv[]) {
 
     // Chase camera mode (C to toggle) - spherical orbit around car
     bool chase_camera = false;
-    float chase_distance = 20.0f;       // Distance from car (radius of orbit sphere)
+    float chase_distance = 10.0f;       // Distance from car (radius of orbit sphere)
     float chase_azimuth = 0.0f;         // Horizontal orbit angle (radians)
     float chase_elevation = 0.5f;       // Vertical orbit angle (radians, 0=level, PI/2=overhead)
 
@@ -526,8 +542,8 @@ int main(int argc, char* argv[]) {
 
                     // Calculate spherical coords from camera to car
                     Vec3 offset = vec3_sub(camera.position, car_pos);
-                    chase_distance = vec3_length(offset);
-                    if (chase_distance < 5.0f) chase_distance = 5.0f;
+                    // Start at a close distance, not the current camera distance
+                    chase_distance = 10.0f;
 
                     // Azimuth: horizontal angle (atan2 of x/z offset)
                     chase_azimuth = atan2f(offset.x, offset.z);
@@ -553,8 +569,10 @@ int main(int argc, char* argv[]) {
 
         // Reload vehicle config and recreate all vehicles with R
         if (input.keys_pressed[KEY_R]) {
-            printf("Reloading vehicle config...\n");
-            config_load_vehicle("../../assets/config/vehicles/sports_car.json", &vehicle_config);
+            printf("Reloading configs...\n");
+            // Reload equipment first (in case equipment files changed)
+            equipment_load_all("../../assets/data/equipment");
+            config_load_vehicle("../../assets/data/vehicles/sports_car.json", &vehicle_config);
             vehicle_cfg = config_vehicle_to_physics(&vehicle_config);
 
             // Destroy and recreate all physics vehicles with new config

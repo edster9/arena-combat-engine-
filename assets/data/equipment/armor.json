@@ -1,0 +1,379 @@
+{
+  "_meta": {
+    "description": "Car Wars vehicle armor types and modifiers",
+    "source": "Car Wars Compendium 2nd Edition, Uncle Albert's Catalog",
+    "units": {
+      "cost": "dollars per point",
+      "weight": "lbs per point"
+    },
+    "notes": [
+      "Armor is purchased per facing: Front, Back, Left, Right, Top, Underbody",
+      "Maximum armor per facing depends on body type",
+      "Plastic armor weighs less but is more expensive",
+      "Metal armor is standard, cheaper but heavier"
+    ]
+  },
+
+  "base_types": {
+    "metal": {
+      "id": "armor_metal",
+      "name": "Metal Armor",
+      "cost_per_point": 10,
+      "weight_per_point": 6,
+      "notes": "Standard vehicle armor"
+    },
+    "plastic": {
+      "id": "armor_plastic",
+      "name": "Plastic Armor",
+      "cost_per_point": 15,
+      "weight_per_point": 3,
+      "notes": "Lighter than metal, more expensive"
+    }
+  },
+
+  "modifiers": {
+    "laser_reflective": {
+      "id": "mod_laser_reflective",
+      "name": "Laser-Reflective (LR)",
+      "cost_modifier": 2.0,
+      "laser_damage_reduction": 0.5,
+      "compatible_with": ["metal", "plastic"],
+      "notes": "Doubles cost, halves damage from lasers"
+    },
+    "fireproof": {
+      "id": "mod_fireproof",
+      "name": "Fireproof (FP)",
+      "cost_modifier": 1.25,
+      "fire_resistance": true,
+      "compatible_with": ["metal", "plastic"],
+      "notes": "Increases cost by 25%, resists fire damage"
+    },
+    "laser_reflective_fireproof": {
+      "id": "mod_lr_fp",
+      "name": "Laser-Reflective Fireproof",
+      "cost_modifier": 2.5,
+      "laser_damage_reduction": 0.5,
+      "fire_resistance": true,
+      "compatible_with": ["metal", "plastic"],
+      "notes": "Combined LR and FP benefits"
+    }
+  },
+
+  "facings": {
+    "front": {
+      "id": "facing_front",
+      "name": "Front",
+      "abbreviation": "F",
+      "collision_priority": 1
+    },
+    "back": {
+      "id": "facing_back",
+      "name": "Back",
+      "abbreviation": "B",
+      "collision_priority": 2
+    },
+    "left": {
+      "id": "facing_left",
+      "name": "Left",
+      "abbreviation": "L",
+      "collision_priority": 3
+    },
+    "right": {
+      "id": "facing_right",
+      "name": "Right",
+      "abbreviation": "R",
+      "collision_priority": 3
+    },
+    "top": {
+      "id": "facing_top",
+      "name": "Top",
+      "abbreviation": "T",
+      "collision_priority": 4
+    },
+    "underbody": {
+      "id": "facing_underbody",
+      "name": "Underbody",
+      "abbreviation": "U",
+      "collision_priority": 5
+    }
+  },
+
+  "max_armor_by_body": {
+    "_notes": "Maximum armor points per facing by body type",
+    "subcompact": {
+      "max_front": 25,
+      "max_back": 20,
+      "max_side": 15,
+      "max_top": 8,
+      "max_underbody": 5
+    },
+    "compact": {
+      "max_front": 30,
+      "max_back": 25,
+      "max_side": 20,
+      "max_top": 10,
+      "max_underbody": 6
+    },
+    "mid_size": {
+      "max_front": 35,
+      "max_back": 30,
+      "max_side": 25,
+      "max_top": 12,
+      "max_underbody": 8
+    },
+    "sedan": {
+      "max_front": 40,
+      "max_back": 35,
+      "max_side": 30,
+      "max_top": 15,
+      "max_underbody": 10
+    },
+    "luxury": {
+      "max_front": 45,
+      "max_back": 40,
+      "max_side": 35,
+      "max_top": 18,
+      "max_underbody": 12
+    },
+    "station_wagon": {
+      "max_front": 40,
+      "max_back": 40,
+      "max_side": 35,
+      "max_top": 15,
+      "max_underbody": 10
+    },
+    "pickup": {
+      "max_front": 50,
+      "max_back": 45,
+      "max_side": 40,
+      "max_top": 20,
+      "max_underbody": 15
+    },
+    "camper": {
+      "max_front": 55,
+      "max_back": 50,
+      "max_side": 45,
+      "max_top": 25,
+      "max_underbody": 18
+    },
+    "van": {
+      "max_front": 60,
+      "max_back": 55,
+      "max_side": 50,
+      "max_top": 30,
+      "max_underbody": 20
+    },
+    "light_cycle": {
+      "max_front": 10,
+      "max_back": 8,
+      "max_side": 6,
+      "max_top": 0,
+      "max_underbody": 0
+    },
+    "medium_cycle": {
+      "max_front": 12,
+      "max_back": 10,
+      "max_side": 8,
+      "max_top": 0,
+      "max_underbody": 0
+    },
+    "heavy_cycle": {
+      "max_front": 15,
+      "max_back": 12,
+      "max_side": 10,
+      "max_top": 0,
+      "max_underbody": 0
+    },
+    "super_cycle": {
+      "max_front": 18,
+      "max_back": 15,
+      "max_side": 12,
+      "max_top": 0,
+      "max_underbody": 0
+    },
+    "light_trike": {
+      "max_front": 15,
+      "max_back": 12,
+      "max_side": 10,
+      "max_top": 5,
+      "max_underbody": 3
+    },
+    "medium_trike": {
+      "max_front": 20,
+      "max_back": 15,
+      "max_side": 12,
+      "max_top": 8,
+      "max_underbody": 5
+    },
+    "heavy_trike": {
+      "max_front": 25,
+      "max_back": 20,
+      "max_side": 15,
+      "max_top": 10,
+      "max_underbody": 6
+    },
+    "super_trike": {
+      "max_front": 30,
+      "max_back": 25,
+      "max_side": 20,
+      "max_top": 12,
+      "max_underbody": 8
+    }
+  },
+
+  "special_armor": {
+    "fake_armor": {
+      "id": "fake_armor",
+      "name": "Fake Armor",
+      "cost_per_point": 2,
+      "weight_per_point": 1,
+      "provides_protection": false,
+      "notes": "Looks like real armor but provides no protection"
+    },
+    "ablative_coating": {
+      "id": "ablative_coating",
+      "name": "Ablative Coating",
+      "cost_per_point": 5,
+      "weight_per_point": 0,
+      "max_points": 10,
+      "absorbs_first_damage": true,
+      "notes": "Absorbs first 10 points of damage, then gone"
+    },
+    "improved_ablative": {
+      "id": "improved_ablative",
+      "name": "Improved Ablative Coating",
+      "cost_per_point": 10,
+      "weight_per_point": 0,
+      "max_points": 20,
+      "absorbs_first_damage": true,
+      "notes": "Absorbs first 20 points of damage, then gone"
+    },
+    "surge_armor": {
+      "id": "surge_armor",
+      "name": "Surge-Absorbing Armor",
+      "cost_modifier": 2.0,
+      "emp_immunity": true,
+      "compatible_with": ["metal", "plastic"],
+      "notes": "Protects against EMP weapons"
+    }
+  },
+
+  "windshield_armor": {
+    "_notes": "Windshield options for front/back",
+    "no_windshield": {
+      "id": "ws_none",
+      "name": "No Windshield",
+      "cost": 0,
+      "weight": 0,
+      "armor_value": 0,
+      "visibility": "full",
+      "notes": "Convertible or open-top only"
+    },
+    "standard_glass": {
+      "id": "ws_standard",
+      "name": "Standard Glass",
+      "cost": 0,
+      "weight": 5,
+      "armor_value": 0,
+      "visibility": "full",
+      "notes": "Provides no protection"
+    },
+    "armored_glass": {
+      "id": "ws_armored",
+      "name": "Armored Glass",
+      "cost_per_point": 15,
+      "weight_per_point": 5,
+      "max_points": 10,
+      "visibility": "full",
+      "notes": "Transparent armor"
+    },
+    "bulletproof_glass": {
+      "id": "ws_bulletproof",
+      "name": "Bulletproof Glass",
+      "cost_per_point": 25,
+      "weight_per_point": 8,
+      "max_points": 20,
+      "visibility": "full",
+      "notes": "Heavy-duty transparent armor"
+    },
+    "vision_blocks": {
+      "id": "ws_vision_blocks",
+      "name": "Vision Blocks",
+      "cost": 200,
+      "weight": 10,
+      "armor_value": "uses_body_armor",
+      "visibility": "reduced",
+      "to_hit_penalty": 1,
+      "notes": "Small armored viewing ports, -1 to hit"
+    },
+    "no_windows": {
+      "id": "ws_no_windows",
+      "name": "No Windows (Solid)",
+      "cost": 0,
+      "weight": 0,
+      "armor_value": "uses_body_armor",
+      "visibility": "none",
+      "requires": ["thermal_imager", "radar", "periscope"],
+      "notes": "Full armor, requires sensors for vision"
+    }
+  },
+
+  "crew_armor": {
+    "body_armor": {
+      "id": "crew_body_armor",
+      "name": "Body Armor",
+      "cost": 200,
+      "weight": 10,
+      "dp": 3,
+      "notes": "Personal protection for crew"
+    },
+    "improved_body_armor": {
+      "id": "crew_improved_body_armor",
+      "name": "Improved Body Armor",
+      "cost": 500,
+      "weight": 15,
+      "dp": 6,
+      "notes": "Enhanced personal protection"
+    },
+    "flak_jacket": {
+      "id": "crew_flak_jacket",
+      "name": "Flak Jacket",
+      "cost": 100,
+      "weight": 5,
+      "dp": 2,
+      "notes": "Basic personal protection"
+    },
+    "helmet": {
+      "id": "crew_helmet",
+      "name": "Helmet",
+      "cost": 50,
+      "weight": 2,
+      "dp": 1,
+      "notes": "Head protection only"
+    },
+    "fireproof_suit": {
+      "id": "crew_fireproof_suit",
+      "name": "Fireproof Suit",
+      "cost": 300,
+      "weight": 8,
+      "fire_resistance": true,
+      "notes": "Protects against fire damage"
+    }
+  },
+
+  "damage_allocation": {
+    "_notes": "Rules for how damage is applied to armor",
+    "breached": {
+      "description": "When armor reaches 0, it is breached",
+      "effect": "Further hits to this facing damage internal components"
+    },
+    "overflow": {
+      "description": "Damage exceeding armor value",
+      "effect": "Excess damage passes through to internals"
+    },
+    "critical_hit": {
+      "roll": "6 on 1d6",
+      "effect": "Bypasses armor, damages internals directly"
+    }
+  }
+}
