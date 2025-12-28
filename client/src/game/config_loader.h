@@ -177,6 +177,55 @@ typedef struct {
     int obstacle_count;
 } SceneJSON;
 
+// Physics mode types
+typedef enum {
+    PHYSICS_MODE_STRICT_CAR_WARS = 0,  // Enforces Car Wars rules
+    PHYSICS_MODE_EXTENDED              // Full configurable physics
+} PhysicsModeType;
+
+// Physics mode tire overrides
+typedef struct {
+    float mu;              // Standardized friction coefficient
+    float reference_radius; // Reference tire radius for torque calc
+    float reference_width;  // Reference tire width
+} PhysicsModeTireOverrides;
+
+// Physics mode suspension overrides
+typedef struct {
+    float frequency;
+    float damping;
+    float travel;
+} PhysicsModeSuspensionOverrides;
+
+// Physics mode transmission overrides
+#define MAX_TRANSMISSION_GEARS 8
+typedef struct {
+    float gear_ratios[MAX_TRANSMISSION_GEARS];
+    int gear_count;
+    float reverse_ratios[MAX_TRANSMISSION_GEARS];
+    int reverse_count;
+    float differential_ratio;
+} PhysicsModeTransmissionOverrides;
+
+// Physics mode overrides
+typedef struct {
+    DrivetrainType drivetrain;
+    bool override_drivetrain;
+    PhysicsModeTireOverrides tire;
+    bool override_tire;
+    PhysicsModeSuspensionOverrides suspension;
+    bool override_suspension;
+    PhysicsModeTransmissionOverrides transmission;
+    bool override_transmission;
+} PhysicsModeOverrides;
+
+// Physics mode configuration
+typedef struct {
+    char name[MAX_NAME_LENGTH];
+    PhysicsModeType type;
+    PhysicsModeOverrides overrides;
+} PhysicsMode;
+
 // Load vehicle configuration from JSON file
 // Returns true on success, false on error (uses defaults on error)
 bool config_load_vehicle(const char* filepath, VehicleJSON* out);
@@ -193,5 +242,19 @@ VehicleJSON config_default_vehicle(void);
 
 // Get default scene config (fallback if JSON fails)
 SceneJSON config_default_scene(void);
+
+// Load physics mode configuration from JSON file
+// Returns true on success, false on error (uses strict mode as default)
+bool config_load_physics_mode(const char* filepath, PhysicsMode* out);
+
+// Get the currently active physics mode
+const PhysicsMode* config_get_physics_mode(void);
+
+// Apply physics mode overrides to a vehicle config
+// Call this after loading vehicle config but before passing to physics
+void config_apply_physics_mode(VehicleJSON* vehicle, const PhysicsMode* mode);
+
+// Check if we're in strict Car Wars mode
+bool config_is_strict_mode(void);
 
 #endif // CONFIG_LOADER_H

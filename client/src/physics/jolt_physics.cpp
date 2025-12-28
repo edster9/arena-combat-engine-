@@ -158,6 +158,9 @@ static bool AssertFailedImpl(const char* inExpression, const char* inMessage, co
 
 static bool sJoltInitialized = false;
 
+// Traction control smoothed slip values (per vehicle)
+static float sTcSmoothedSlip[MAX_PHYSICS_VEHICLES] = {0};
+
 extern "C" {
 
 bool physics_init(PhysicsWorld* pw)
@@ -275,8 +278,79 @@ void physics_step(PhysicsWorld* pw, float dt)
             // Calculate forward input from throttle/reverse
             float forward = v->throttle - v->reverse;
 
+            // ========== TRACTION CONTROL ==========
+            // Reduce throttle when wheel slip exceeds threshold
+            // This simulates Car Wars assumption of consistent acceleration
+            const float TC_SLIP_THRESHOLD = 0.10f;  // Start reducing at 10% slip
+            const float TC_SLIP_MAX = 0.30f;        // Full reduction at 30% slip
+            const float TC_MIN_THROTTLE = 0.3f;     // Never reduce below 30% of requested
+            const float TC_SMOOTHING = 0.15f;       // Smoothing factor (lower = smoother, slower response)
+
+            if (forward > 0.0f)  // Only apply TC during acceleration
+            {
+                BodyInterface& bodyInterface = impl->physicsSystem->GetBodyInterface();
+                JPH::Vec3 vel = bodyInterface.GetLinearVelocity(vimpl->bodyId);
+                const Wheels& wheels = vimpl->constraint->GetWheels();
+                float maxSlip = 0.0f;
+
+                for (size_t w = 0; w < wheels.size() && w < 4; w++) {
+                    const Wheel* wheel = wheels[w];
+                    if (!wheel->HasContact()) continue;
+
+                    float wheelRadius = wheel->GetSettings()->mRadius;
+                    float wheelAngVel = wheel->GetAngularVelocity();
+                    float wheelSpeed = wheelAngVel * wheelRadius;
+
+                    JPH::Vec3 wheelFwd = wheel->GetContactLongitudinal();
+                    float vehicleSpeed = vel.Dot(wheelFwd);
+
+                    float maxSpeed = std::max(std::abs(wheelSpeed), std::abs(vehicleSpeed));
+                    if (maxSpeed > 0.5f) {  // Only check at reasonable speeds
+                        float slip = (wheelSpeed - vehicleSpeed) / maxSpeed;
+                        if (slip > maxSlip) maxSlip = slip;
+                    }
+                }
+
+                // Smooth the slip value to reduce oscillation between frames
+                sTcSmoothedSlip[i] = sTcSmoothedSlip[i] + TC_SMOOTHING * (maxSlip - sTcSmoothedSlip[i]);
+
+                // Apply traction control: reduce throttle proportionally to smoothed slip
+                if (sTcSmoothedSlip[i] > TC_SLIP_THRESHOLD) {
+                    float slipExcess = (sTcSmoothedSlip[i] - TC_SLIP_THRESHOLD) / (TC_SLIP_MAX - TC_SLIP_THRESHOLD);
+                    slipExcess = std::min(1.0f, std::max(0.0f, slipExcess));
+                    float tcMultiplier = 1.0f - slipExcess * (1.0f - TC_MIN_THROTTLE);
+                    forward *= tcMultiplier;
+                }
+            }
+            else {
+                // Reset smoothed slip when not accelerating
+                sTcSmoothedSlip[i] = 0.0f;
+            }
+
             // Apply driver input
             controller->SetDriverInput(forward, v->steering, v->brake, 0.0f);
+
+            // ========== CAR WARS LINEAR ACCELERATION MODE ==========
+            // In strict Car Wars mode, bypass engine simulation entirely
+            // Apply constant force F = m * a for consistent acceleration
+            if (v->config.use_linear_accel && forward > 0.0f)
+            {
+                BodyInterface& bodyInterface = impl->physicsSystem->GetBodyInterface();
+                JPH::Vec3 vel = bodyInterface.GetLinearVelocity(vimpl->bodyId);
+                float speed = vel.Length();
+
+                // Only apply force if below top speed
+                if (speed < v->config.top_speed_ms)
+                {
+                    // Get vehicle's forward direction (Z axis in local space)
+                    JPH::Quat rot = bodyInterface.GetRotation(vimpl->bodyId);
+                    JPH::Vec3 forwardDir = rot.RotateAxisZ();
+
+                    // Apply force proportional to throttle
+                    float force = v->config.linear_accel_force * forward;
+                    bodyInterface.AddForce(vimpl->bodyId, forwardDir * force);
+                }
+            }
 
             // Debug: Print engine state every 60 frames for first vehicle
             static int debugCounter = 0;
@@ -284,94 +358,127 @@ void physics_step(PhysicsWorld* pw, float dt)
                 const VehicleEngine& engine = controller->GetEngine();
                 const VehicleTransmission& trans = controller->GetTransmission();
                 int gear = trans.GetCurrentGear();
-                float gearRatio = (gear >= 0 && gear < 5) ?
-                    std::vector<float>{2.66f, 1.78f, 1.3f, 1.0f, 0.74f}[gear] :
-                    (gear == -1 ? 2.9f : 1.0f);
-                float diffRatio = 3.42f;
+                const auto& gearRatios = trans.mGearRatios;
+                // GetCurrentGear() returns 1 for first forward gear, but mGearRatios[0] is first gear ratio
+                int gearIndex = gear - 1;  // Convert to 0-based index
+                float gearRatio = (gearIndex >= 0 && gearIndex < (int)gearRatios.size()) ?
+                    gearRatios[gearIndex] : (gear == -1 ? trans.mReverseGearRatios[0] : 1.0f);
+                float diffRatio = (v->config.use_config_transmission && v->config.differential_ratio > 0) ?
+                    v->config.differential_ratio : 1.29f;
                 float wheelTorque = engine.GetTorque(forward) * gearRatio * diffRatio;
 
-                printf("Engine: MaxT=%.0fNm, RPM=%.0f, Torque=%.1fNm, Gear=%d(%.2fx), WheelT=%.0fNm, Input=%.2f\n",
-                       engine.mMaxTorque,
-                       engine.GetCurrentRPM(),
-                       engine.GetTorque(forward),
-                       gear, gearRatio,
-                       wheelTorque,
-                       forward);
+                // Get car speed for RPM comparison
+                BodyInterface& bodyInterface = impl->physicsSystem->GetBodyInterface();
+                JPH::Vec3 vel = bodyInterface.GetLinearVelocity(vimpl->bodyId);
+                float speedMs = vel.Length();
+                float speedMph = speedMs * 2.237f;
+
+                // Calculate expected RPM based on speed (if gears were perfectly coupled)
+                float wheelRadS = speedMs / v->config.wheel_radius;
+                float expectedRPM = wheelRadS * gearRatio * diffRatio * 60.0f / (2.0f * 3.14159f);
+
+                // Get wheel slip info
+                // Calculate longitudinal slip: (wheel_speed - vehicle_speed) / max(wheel_speed, vehicle_speed)
+                const Wheels& wheels = vimpl->constraint->GetWheels();
+                float maxSlip = 0.0f;
+                bool anyWheelSpinning = false;
+                for (size_t w = 0; w < wheels.size() && w < 4; w++) {
+                    const Wheel* wheel = wheels[w];
+                    if (!wheel->HasContact()) continue;  // No contact = no slip
+
+                    float wheelRadius = wheel->GetSettings()->mRadius;
+                    float wheelAngVel = wheel->GetAngularVelocity();  // rad/s
+                    float wheelSpeed = wheelAngVel * wheelRadius;     // m/s at wheel surface
+
+                    // Use vehicle velocity in wheel's forward direction (not ground contact velocity!)
+                    JPH::Vec3 wheelFwd = wheel->GetContactLongitudinal();
+                    float vehicleSpeedInWheelDir = vel.Dot(wheelFwd);  // m/s in wheel forward dir
+
+                    // Calculate slip ratio
+                    float maxSpeed = std::max(std::abs(wheelSpeed), std::abs(vehicleSpeedInWheelDir));
+                    float slip = 0.0f;
+                    if (maxSpeed > 0.1f) {  // Avoid division by zero at low speeds
+                        slip = (wheelSpeed - vehicleSpeedInWheelDir) / maxSpeed;
+                    }
+
+                    if (std::abs(slip) > std::abs(maxSlip)) maxSlip = slip;
+                    if (slip > 0.1f) anyWheelSpinning = true;  // >10% slip = spinning
+                }
+
+                // Check if TC is active (same thresholds as above)
+                bool tcActive = (maxSlip > 0.10f);
+                const char* slipStatus = tcActive ? " [TC]" : (anyWheelSpinning ? " [SPINNING]" : "");
+
+                printf("Gear=%d/%d(%.2fx) RPM=%.0f(expect %.0f) Clutch=%.0f%% Speed=%.0f mph Slip=%.0f%%%s\n",
+                       gear, (int)gearRatios.size(), gearRatio,
+                       engine.GetCurrentRPM(), expectedRPM,
+                       trans.GetClutchFriction() * 100.0f,
+                       speedMph,
+                       maxSlip * 100.0f,
+                       slipStatus);
             }
 
             // ========== ACCELERATION TEST ==========
-            // For any vehicle with throttle input
+            // Key-triggered test (T key), auto-ends at 60 mph
+            // Timer only starts when throttle is applied (forward > 0)
+            if (v->accel_test_active)
             {
-                // Debug: print once on first throttle for any vehicle
-                static bool first_throttle_debug = true;
-                if (first_throttle_debug && forward > 0) {
-                    printf("Accel test init: vehicle %d, forward=%.2f\n", i, forward);
-                    fflush(stdout);
-                    first_throttle_debug = false;
-                }
-
                 BodyInterface& bodyInterface = impl->physicsSystem->GetBodyInterface();
                 JPH::Vec3 vel = bodyInterface.GetLinearVelocity(vimpl->bodyId);
                 float speed = vel.Length();
                 RVec3 pos = bodyInterface.GetPosition(vimpl->bodyId);
 
-                // Start test: throttle applied and vehicle nearly stopped
-                if (!v->accel_test_active && forward > 0.1f && speed < 1.0f)
+                // Start timing only when throttle is applied
+                if (!v->accel_test_timing_started && forward > 0)
                 {
-                    v->accel_test_active = true;
-                    v->accel_test_elapsed = 0.0f;
-                    v->accel_test_print_timer = 0.0f;
+                    v->accel_test_timing_started = true;
                     v->accel_test_start_pos = (::Vec3){(float)pos.GetX(), (float)pos.GetY(), (float)pos.GetZ()};
                     v->accel_test_last_speed = speed;
-                    printf("\n=== ACCEL TEST START (vehicle %d) ===\n", i);
-                    printf("Power: %.0fN (%.0fNm), Mass: %.0fkg\n",
-                           v->config.max_motor_force, v->config.engine_max_torque, v->config.chassis_mass);
+                    printf("[ACCEL TEST] Timing started (throttle detected)\n");
                     fflush(stdout);
                 }
 
-                // Update test if active
-                if (v->accel_test_active)
+                // Only count time once timing has started
+                if (v->accel_test_timing_started)
                 {
                     v->accel_test_elapsed += pw->step_size;
-                    v->accel_test_print_timer += pw->step_size;
 
-                    // Calculate distance traveled
-                    float dx = (float)pos.GetX() - v->accel_test_start_pos.x;
-                    float dz = (float)pos.GetZ() - v->accel_test_start_pos.z;
-                    float distance = sqrtf(dx*dx + dz*dz);
-
-                    // Print every 0.5 seconds
-                    if (v->accel_test_print_timer >= 0.5f)
-                    {
-                        float avgAccel = speed / v->accel_test_elapsed;  // m/s^2
-                        float speedMph = speed * 2.23694f;
-                        printf("t=%.1fs: %.1f m/s (%.1f mph), dist=%.1fm, avg accel=%.2f m/s²\n",
-                               v->accel_test_elapsed, speed, speedMph, distance, avgAccel);
-                        fflush(stdout);
-                        v->accel_test_print_timer = 0.0f;
-                    }
-
-                    // Stop test conditions:
-                    // 1. Throttle released
-                    // 2. Sudden speed drop (collision) - speed dropped by more than 30%
-                    // 3. Stopped moving (after having moved)
-                    bool throttleReleased = forward < 0.1f;
+                    // Stop conditions: 60 mph (26.82 m/s), collision, or timeout
+                    float targetSpeed = 26.82f;  // 60 mph in m/s
+                    bool reachedTarget = speed >= targetSpeed;
                     bool collision = (v->accel_test_last_speed > 5.0f && speed < v->accel_test_last_speed * 0.7f);
-                    bool stopped = (v->accel_test_elapsed > 1.0f && speed < 0.1f);
+                    bool timeout = v->accel_test_elapsed > 30.0f;
 
-                    if (throttleReleased || collision || stopped)
+                    if (reachedTarget || collision || timeout)
                     {
                         float avgAccel = speed / v->accel_test_elapsed;
                         float speedMph = speed * 2.23694f;
-                        printf("=== ACCEL TEST END ===\n");
-                        printf("Final: t=%.2fs, %.1f m/s (%.1f mph), dist=%.1fm\n",
-                               v->accel_test_elapsed, speed, speedMph, distance);
-                        printf("Average acceleration: %.2f m/s² (0-60 mph in ~%.1fs)\n",
-                               avgAccel, 26.82f / avgAccel);  // 26.82 m/s = 60 mph
-                        if (collision) printf("(Test ended due to collision)\n");
-                        printf("\n");
+
+                        // Use vehicle's configured target (from PF/weight ratio)
+                        float targetAccel = v->config.target_accel_ms2;
+                        float target060 = v->config.target_0_60_seconds;
+                        if (targetAccel <= 0.0f) {
+                            targetAccel = 4.47f;  // Fallback: 10 mph/s
+                            target060 = 6.0f;
+                        }
+
+                        // Calculate result
+                        float accelPercent = (avgAccel / targetAccel) * 100.0f;
+                        bool passed = (v->accel_test_elapsed <= target060 * 1.05f);  // 5% tolerance
+
+                        // Output with vehicle name and pass/fail
+                        printf("\n[ACCEL TEST] %s\n", v->config.vehicle_name[0] ? v->config.vehicle_name : "Vehicle");
+                        printf("  0-60: %.2fs (target: %.1fs) %s\n",
+                               v->accel_test_elapsed, target060, passed ? "PASS" : "FAIL");
+                        printf("  Avg Accel: %.2f m/s² (%.0f%% of target %.2f m/s²)\n",
+                               avgAccel, accelPercent, targetAccel);
+                        printf("  Final: %.0f mph\n", speedMph);
+                        if (collision) printf("  (ended early - collision detected)\n");
+                        if (timeout) printf("  (timeout - did not reach 60 mph)\n");
                         fflush(stdout);
+
                         v->accel_test_active = false;
+                        v->accel_test_timing_started = false;
                     }
 
                     v->accel_test_last_speed = speed;
@@ -532,6 +639,7 @@ int physics_create_vehicle(PhysicsWorld* pw, ::Vec3 position, float rotation_y, 
 
     // Initialize acceleration test state
     v->accel_test_active = false;
+    v->accel_test_timing_started = false;
     v->accel_test_elapsed = 0.0f;
     v->accel_test_print_timer = 0.0f;
     v->accel_test_start_pos = (::Vec3){0, 0, 0};
@@ -641,15 +749,18 @@ int physics_create_vehicle(PhysicsWorld* pw, ::Vec3 position, float rotation_y, 
         if (tireMu <= 0) tireMu = 1.0f;  // Default friction coefficient
         // Jolt's friction curves: slip ratio/angle -> friction multiplier
         // Scale by our mu to get actual friction
+        // IMPORTANT: Curve must extend to 1.0 (100% slip) for wheelspin scenarios
         ws->mLongitudinalFriction.mPoints.clear();
         ws->mLongitudinalFriction.mPoints.push_back({0.0f, 0.0f});
         ws->mLongitudinalFriction.mPoints.push_back({0.06f, tireMu * 1.2f});  // Peak at 6% slip
-        ws->mLongitudinalFriction.mPoints.push_back({0.2f, tireMu * 1.0f});   // Sliding friction
+        ws->mLongitudinalFriction.mPoints.push_back({0.2f, tireMu * 1.0f});   // Transition
+        ws->mLongitudinalFriction.mPoints.push_back({1.0f, tireMu * 0.8f});   // Full wheelspin (80% of mu)
 
         ws->mLateralFriction.mPoints.clear();
         ws->mLateralFriction.mPoints.push_back({0.0f, 0.0f});
         ws->mLateralFriction.mPoints.push_back({3.0f, tireMu * 1.2f});   // Peak at 3 degrees
-        ws->mLateralFriction.mPoints.push_back({20.0f, tireMu * 1.0f});  // Sliding friction
+        ws->mLateralFriction.mPoints.push_back({20.0f, tireMu * 1.0f});  // Sliding
+        ws->mLateralFriction.mPoints.push_back({90.0f, tireMu * 0.8f});  // Full sideways slide
 
         vehicleSettings.mWheels.push_back(ws);
     }
@@ -683,10 +794,43 @@ int physics_create_vehicle(PhysicsWorld* pw, ::Vec3 position, float rotation_y, 
     // Higher inertia = slower RPM changes, more realistic heavy engine feel
     controllerSettings->mEngine.mInertia = 0.5f + (maxTorque / 1000.0f);  // 0.5 to ~2.0
 
-    // Transmission
+    // Transmission - use config values if available, else defaults
     controllerSettings->mTransmission.mMode = ETransmissionMode::Auto;
-    controllerSettings->mTransmission.mGearRatios = { 2.66f, 1.78f, 1.3f, 1.0f, 0.74f };
-    controllerSettings->mTransmission.mReverseGearRatios = { -2.9f };
+    if (config->use_config_transmission && config->gear_count > 0)
+    {
+        // Use config gear ratios
+        Array<float> gears;
+        printf("  Transmission from config: %d gears [", config->gear_count);
+        for (int i = 0; i < config->gear_count; i++) {
+            gears.push_back(config->gear_ratios[i]);
+            printf("%.2f%s", config->gear_ratios[i], i < config->gear_count-1 ? ", " : "");
+        }
+        printf("], diff=%.2f\n", config->differential_ratio);
+        controllerSettings->mTransmission.mGearRatios = gears;
+
+        Array<float> reverseGears;
+        for (int i = 0; i < config->reverse_count; i++)
+            reverseGears.push_back(config->reverse_ratios[i]);
+        controllerSettings->mTransmission.mReverseGearRatios = reverseGears;
+    }
+    else
+    {
+        // Default gear ratios tuned for Car Wars 10 mph/s target (4.47 m/s²)
+        controllerSettings->mTransmission.mGearRatios = { 1.5f, 1.2f, 1.0f, 0.85f, 0.7f };
+        controllerSettings->mTransmission.mReverseGearRatios = { -1.5f };
+        printf("  Transmission: using defaults (5 gears)\n");
+    }
+
+    // Auto-shift RPM thresholds - shift up at 90% of max RPM, down at 40%
+    float maxRPM = controllerSettings->mEngine.mMaxRPM;
+    controllerSettings->mTransmission.mShiftUpRPM = maxRPM * 0.9f;    // 5400 RPM for 6000 max
+    controllerSettings->mTransmission.mShiftDownRPM = maxRPM * 0.4f;  // 2400 RPM
+    controllerSettings->mTransmission.mSwitchTime = 0.3f;             // Faster shifts
+    printf("  Shift points: up=%.0f RPM, down=%.0f RPM, switch=%.1fs\n",
+           controllerSettings->mTransmission.mShiftUpRPM,
+           controllerSettings->mTransmission.mShiftDownRPM,
+           controllerSettings->mTransmission.mSwitchTime);
+
     // Clutch strength determines max torque transfer: ClutchStrength * EngineInertia
     // Scale it based on engine torque for proper power delivery
     controllerSettings->mTransmission.mClutchStrength = clutchStrength;
@@ -705,16 +849,22 @@ int physics_create_vehicle(PhysicsWorld* pw, ::Vec3 position, float rotation_y, 
         }
     }
 
+    // Differential ratio - use config value if available, else default
+    float diffRatio = (config->use_config_transmission && config->differential_ratio > 0) ?
+        config->differential_ratio : 1.29f;  // Default tuned for Car Wars 10 mph/s target
+    printf("  Differential: ratio=%.2f (use_config=%d, config_val=%.2f)\n",
+           diffRatio, config->use_config_transmission, config->differential_ratio);
+
     if (frontDriven && rearDriven)
     {
         // AWD - two differentials
         controllerSettings->mDifferentials.resize(2);
         controllerSettings->mDifferentials[0].mLeftWheel = WHEEL_FL;
         controllerSettings->mDifferentials[0].mRightWheel = WHEEL_FR;
-        controllerSettings->mDifferentials[0].mDifferentialRatio = 3.42f;
+        controllerSettings->mDifferentials[0].mDifferentialRatio = diffRatio;
         controllerSettings->mDifferentials[1].mLeftWheel = WHEEL_RL;
         controllerSettings->mDifferentials[1].mRightWheel = WHEEL_RR;
-        controllerSettings->mDifferentials[1].mDifferentialRatio = 3.42f;
+        controllerSettings->mDifferentials[1].mDifferentialRatio = diffRatio;
     }
     else if (frontDriven)
     {
@@ -722,7 +872,7 @@ int physics_create_vehicle(PhysicsWorld* pw, ::Vec3 position, float rotation_y, 
         controllerSettings->mDifferentials.resize(1);
         controllerSettings->mDifferentials[0].mLeftWheel = WHEEL_FL;
         controllerSettings->mDifferentials[0].mRightWheel = WHEEL_FR;
-        controllerSettings->mDifferentials[0].mDifferentialRatio = 3.42f;
+        controllerSettings->mDifferentials[0].mDifferentialRatio = diffRatio;
     }
     else
     {
@@ -730,7 +880,7 @@ int physics_create_vehicle(PhysicsWorld* pw, ::Vec3 position, float rotation_y, 
         controllerSettings->mDifferentials.resize(1);
         controllerSettings->mDifferentials[0].mLeftWheel = WHEEL_RL;
         controllerSettings->mDifferentials[0].mRightWheel = WHEEL_RR;
-        controllerSettings->mDifferentials[0].mDifferentialRatio = 3.42f;
+        controllerSettings->mDifferentials[0].mDifferentialRatio = diffRatio;
     }
 
     vehicleSettings.mController = controllerSettings;
@@ -842,8 +992,48 @@ void physics_vehicle_respawn(PhysicsWorld* pw, int vehicle_id)
 
     // Reset acceleration test for new run
     v->accel_test_active = false;
+    v->accel_test_timing_started = false;
     v->accel_test_elapsed = 0.0f;
     v->accel_test_print_timer = 0.0f;
+
+    // Reset traction control state for consistent first-run behavior
+    sTcSmoothedSlip[vehicle_id] = 0.0f;
+}
+
+void physics_vehicle_start_accel_test(PhysicsWorld* pw, int vehicle_id)
+{
+    if (!pw || !pw->impl) return;
+    if (vehicle_id < 0 || vehicle_id >= MAX_PHYSICS_VEHICLES) return;
+
+    PhysicsVehicle* v = &pw->vehicles[vehicle_id];
+    if (!v->active || !v->impl) return;
+
+    auto* impl = pw->impl;
+    auto* vimpl = v->impl;
+    BodyInterface& bodyInterface = impl->physicsSystem->GetBodyInterface();
+
+    // Get current position and velocity
+    RVec3 pos = bodyInterface.GetPosition(vimpl->bodyId);
+    JPH::Vec3 vel = bodyInterface.GetLinearVelocity(vimpl->bodyId);
+    float speed = vel.Length();
+
+    // If already running, stop and report
+    if (v->accel_test_active) {
+        printf("[ACCEL TEST] Test cancelled\n");
+        v->accel_test_active = false;
+        return;
+    }
+
+    // Start the test
+    v->accel_test_active = true;
+    v->accel_test_timing_started = false;  // Wait for throttle before timing
+    v->accel_test_elapsed = 0.0f;
+    v->accel_test_print_timer = 0.0f;
+    v->accel_test_start_pos = (::Vec3){(float)pos.GetX(), (float)pos.GetY(), (float)pos.GetZ()};
+    v->accel_test_last_speed = speed;
+
+    printf("[ACCEL TEST] Started - floor it! (target: 60 mph / 26.82 m/s)\n");
+    fflush(stdout);
 }
 
 void physics_vehicle_get_position(PhysicsWorld* pw, int vehicle_id, ::Vec3* pos)

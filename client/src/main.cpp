@@ -375,11 +375,20 @@ int main(int argc, char* argv[]) {
         fprintf(stderr, "Warning: Equipment data not loaded - using defaults\n");
     }
 
+    // Load physics mode configuration (strict vs extended)
+    PhysicsMode physics_mode;
+    config_load_physics_mode("../../assets/config/physics_modes.json", &physics_mode);
+
     // Load JSON configs - these are required for correct physics
     SceneJSON scene_config;
     VehicleJSON vehicle_config;
     bool scene_ok = config_load_scene("../../assets/config/scenes/showdown.json", &scene_config);
     bool vehicle_ok = config_load_vehicle("../../assets/data/vehicles/sports_car.json", &vehicle_config);
+
+    // Apply physics mode overrides to vehicle config
+    if (vehicle_ok) {
+        config_apply_physics_mode(&vehicle_config, &physics_mode);
+    }
 
     if (!scene_ok) {
         fprintf(stderr, "\n*** ERROR: Scene config failed to load! ***\n");
@@ -522,12 +531,54 @@ int main(int argc, char* argv[]) {
         // Input
         platform_poll_events(&platform, &input);
 
-        // Toggle mouse capture with right click
-        if (input.mouse_pressed[MOUSE_RIGHT]) {
+        // Toggle mouse capture with middle click (for camera orbit/look)
+        if (input.mouse_pressed[MOUSE_MIDDLE]) {
             platform_capture_mouse(&platform, &input, true);
         }
-        if (input.mouse_released[MOUSE_RIGHT]) {
+        if (input.mouse_released[MOUSE_MIDDLE]) {
             platform_capture_mouse(&platform, &input, false);
+        }
+
+        // Number keys 1-0 select vehicles by physics index
+        // Shift+number also enables chase camera
+        {
+            int key_to_vehicle[10] = {KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8, KEY_9, KEY_0};
+            bool shift_held = input.keys[KEY_LSHIFT] || input.keys[KEY_RSHIFT];
+
+            for (int v = 0; v < 10; v++) {
+                if (input.keys_pressed[key_to_vehicle[v]]) {
+                    // Find entity that maps to physics vehicle v
+                    int target_phys_id = v;
+                    if (target_phys_id < physics.vehicle_count && physics.vehicles[target_phys_id].active) {
+                        // Find the entity with this physics id
+                        for (int i = 0; i < entities.count; i++) {
+                            Entity* e = &entities.entities[i];
+                            if (e->active && e->id < MAX_ENTITIES && entity_to_physics[e->id] == target_phys_id) {
+                                entity_manager_select(&entities, e->id);
+                                printf("Selected vehicle %d\n", v + 1);
+
+                                // Shift+number also enables chase camera
+                                if (shift_held && !chase_camera) {
+                                    chase_camera = true;
+                                    // Initialize chase camera from current position
+                                    Vec3 car_pos;
+                                    physics_vehicle_get_position(&physics, target_phys_id, &car_pos);
+                                    Vec3 offset = vec3_sub(camera.position, car_pos);
+                                    chase_distance = 10.0f;
+                                    chase_azimuth = atan2f(offset.x, offset.z);
+                                    float horiz_dist = sqrtf(offset.x * offset.x + offset.z * offset.z);
+                                    chase_elevation = atan2f(offset.y, horiz_dist);
+                                    if (chase_elevation < 0.175f) chase_elevation = 0.175f;
+                                    if (chase_elevation > 1.22f) chase_elevation = 1.22f;
+                                    printf("Chase camera ON\n");
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
         }
 
         // Fullscreen toggle
@@ -609,9 +660,14 @@ int main(int argc, char* argv[]) {
             // Reload equipment first (in case equipment files changed)
             equipment_load_all("../../assets/data/equipment");
 
+            // Reload physics mode
+            config_load_physics_mode("../../assets/config/physics_modes.json", &physics_mode);
+
             // Try to reload vehicle config
             VehicleJSON new_vehicle_config;
             if (config_load_vehicle("../../assets/data/vehicles/sports_car.json", &new_vehicle_config)) {
+                // Apply physics mode overrides
+                config_apply_physics_mode(&new_vehicle_config, &physics_mode);
                 vehicle_config = new_vehicle_config;
                 VehicleConfig vehicle_cfg = config_vehicle_to_physics(&vehicle_config);
 
@@ -661,6 +717,16 @@ int main(int argc, char* argv[]) {
                 printf("Game mode: %s\n", game_mode == MODE_FREESTYLE ? "FREESTYLE" : "TURN-BASED");
             } else {
                 printf("Select a vehicle first (F)\n");
+            }
+        }
+
+        // Start acceleration test with T (requires selected vehicle)
+        if (input.keys_pressed[KEY_T]) {
+            Entity* sel = entity_manager_get_selected(&entities);
+            if (sel && sel->id < MAX_ENTITIES && entity_to_physics[sel->id] >= 0) {
+                physics_vehicle_start_accel_test(&physics, entity_to_physics[sel->id]);
+            } else {
+                printf("Select a vehicle first (T)\n");
             }
         }
 
@@ -1144,7 +1210,7 @@ int main(int argc, char* argv[]) {
 
                 text_draw(&text_renderer, "CAMERA", tx, ty, UI_COLOR_CAUTION);
                 ty += line_h;
-                text_draw(&text_renderer, "  RMB+drag  Look", tx, ty, UI_COLOR_WHITE);
+                text_draw(&text_renderer, "  MMB+drag  Look", tx, ty, UI_COLOR_WHITE);
                 ty += line_h;
                 text_draw(&text_renderer, "  WASD      Move", tx, ty, UI_COLOR_WHITE);
                 ty += line_h;
@@ -1156,16 +1222,25 @@ int main(int argc, char* argv[]) {
                 ty += line_h;
                 text_draw(&text_renderer, "  C         Chase cam", tx, ty, UI_COLOR_WHITE);
                 ty += line_h;
-                text_draw(&text_renderer, "  RMB+drag  Orbit (chase)", tx, ty, UI_COLOR_WHITE);
+                text_draw(&text_renderer, "  MMB+drag  Orbit (chase)", tx, ty, UI_COLOR_WHITE);
+                ty += line_h * 1.3f;
+
+                text_draw(&text_renderer, "SELECTION", tx, ty, UI_COLOR_CAUTION);
+                ty += line_h;
+                text_draw(&text_renderer, "  LMB       Click select", tx, ty, UI_COLOR_WHITE);
+                ty += line_h;
+                text_draw(&text_renderer, "  1-0       Select car 1-10", tx, ty, UI_COLOR_WHITE);
+                ty += line_h;
+                text_draw(&text_renderer, "  Shift+num Select + chase", tx, ty, UI_COLOR_WHITE);
                 ty += line_h * 1.3f;
 
                 text_draw(&text_renderer, "GAMEPLAY", tx, ty, UI_COLOR_CAUTION);
                 ty += line_h;
-                text_draw(&text_renderer, "  LMB       Select", tx, ty, UI_COLOR_WHITE);
-                ty += line_h;
                 text_draw(&text_renderer, "  Arrows    Drive", tx, ty, UI_COLOR_WHITE);
                 ty += line_h;
                 text_draw(&text_renderer, "  R         Respawn", tx, ty, UI_COLOR_WHITE);
+                ty += line_h;
+                text_draw(&text_renderer, "  T         Accel Test", tx, ty, UI_COLOR_WHITE);
                 ty += line_h;
                 text_draw(&text_renderer, "  F         Mode", tx, ty, UI_COLOR_WHITE);
                 ty += line_h * 1.3f;

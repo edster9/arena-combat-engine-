@@ -97,6 +97,23 @@ typedef struct {
     float brake_force_multiplier;  // Multiplied by mass for actual force
 } BrakeEquipment;
 
+// Gearbox/Transmission type
+#define MAX_GEARS 8
+typedef struct {
+    char id[MAX_EQUIPMENT_ID];
+    char name[MAX_EQUIPMENT_NAME];
+    int cost;
+    int weight_lbs;
+    // Physics values (Jolt transmission)
+    float gear_ratios[MAX_GEARS];
+    int gear_count;
+    float reverse_ratios[MAX_GEARS];
+    int reverse_count;
+    float differential_ratio;
+    float shift_up_rpm;
+    float shift_down_rpm;
+} GearboxEquipment;
+
 // Equipment database (singleton-ish, loaded once)
 typedef struct {
     ChassisEquipment chassis[MAX_EQUIPMENT_ITEMS];
@@ -117,6 +134,9 @@ typedef struct {
     BrakeEquipment brakes[MAX_EQUIPMENT_ITEMS];
     int brake_count;
 
+    GearboxEquipment gearboxes[MAX_EQUIPMENT_ITEMS];
+    int gearbox_count;
+
     bool loaded;
 } EquipmentDB;
 
@@ -134,6 +154,7 @@ const TireEquipment* equipment_find_tire(const char* id);
 const TireModifier* equipment_find_tire_modifier(const char* id);
 const SuspensionEquipment* equipment_find_suspension(const char* id);
 const BrakeEquipment* equipment_find_brake(const char* id);
+const GearboxEquipment* equipment_find_gearbox(const char* id);
 
 // Calculate combined tire physics after applying modifiers
 typedef struct {

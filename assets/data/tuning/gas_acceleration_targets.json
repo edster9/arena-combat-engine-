@@ -1,0 +1,232 @@
+{
+  "_meta": {
+    "description": "Gas engine acceleration targets based on Car Wars rules",
+    "acceleration_classes": {
+      "5_mph_s": { "pf_weight_ratio": 0.333, "target_0_60_seconds": 12.0 },
+      "10_mph_s": { "pf_weight_ratio": 0.500, "target_0_60_seconds": 6.0 },
+      "15_mph_s": { "pf_weight_ratio": 1.000, "target_0_60_seconds": 4.0 }
+    },
+    "notes": [
+      "PF = Power Factors from engine",
+      "Weight = chassis + engine + tires + armor + cargo",
+      "Acceleration class determined by PF/Weight ratio",
+      "motor_force values may need tuning to hit target times"
+    ]
+  },
+
+  "chassis_base_weights_lbs": {
+    "subcompact": 1000,
+    "compact": 1300,
+    "mid_sized": 1600,
+    "sedan": 1700,
+    "luxury": 2100,
+    "station_wagon": 2000,
+    "pickup": 2400,
+    "van": 2800
+  },
+
+  "gas_engines": [
+    {
+      "id": "gas_10cid",
+      "name": "10 cid",
+      "power_factors": 300,
+      "weight_lbs": 60,
+      "motor_force": 1050,
+      "max_vehicle_weight_5mph": 900,
+      "max_vehicle_weight_10mph": 600,
+      "max_vehicle_weight_15mph": 300,
+      "notes": "Cycle/trike only - too weak for cars"
+    },
+    {
+      "id": "gas_30cid",
+      "name": "30 cid",
+      "power_factors": 500,
+      "weight_lbs": 115,
+      "motor_force": 1750,
+      "max_vehicle_weight_5mph": 1500,
+      "max_vehicle_weight_10mph": 1000,
+      "max_vehicle_weight_15mph": 500,
+      "notes": "Subcompact at 5 mph/s class"
+    },
+    {
+      "id": "gas_50cid",
+      "name": "50 cid",
+      "power_factors": 700,
+      "weight_lbs": 150,
+      "motor_force": 2450,
+      "max_vehicle_weight_5mph": 2100,
+      "max_vehicle_weight_10mph": 1400,
+      "max_vehicle_weight_15mph": 700,
+      "notes": "Compact at 5 mph/s, subcompact at 10 mph/s"
+    },
+    {
+      "id": "gas_100cid",
+      "name": "100 cid",
+      "power_factors": 1300,
+      "weight_lbs": 265,
+      "motor_force": 4550,
+      "max_vehicle_weight_5mph": 3900,
+      "max_vehicle_weight_10mph": 2600,
+      "max_vehicle_weight_15mph": 1300,
+      "notes": "Compact at 10 mph/s"
+    },
+    {
+      "id": "gas_150cid",
+      "name": "150 cid",
+      "power_factors": 1900,
+      "weight_lbs": 375,
+      "motor_force": 6650,
+      "max_vehicle_weight_5mph": 5700,
+      "max_vehicle_weight_10mph": 3800,
+      "max_vehicle_weight_15mph": 1900,
+      "notes": "Compact at 15 mph/s, mid-sized at 10 mph/s"
+    },
+    {
+      "id": "gas_200cid",
+      "name": "200 cid",
+      "power_factors": 2500,
+      "weight_lbs": 480,
+      "motor_force": 8750,
+      "max_vehicle_weight_5mph": 7500,
+      "max_vehicle_weight_10mph": 5000,
+      "max_vehicle_weight_15mph": 2500,
+      "notes": "Mid-sized at 15 mph/s, sedan at 10 mph/s"
+    },
+    {
+      "id": "gas_250cid",
+      "name": "250 cid",
+      "power_factors": 3200,
+      "weight_lbs": 715,
+      "motor_force": 11200,
+      "max_vehicle_weight_5mph": 9600,
+      "max_vehicle_weight_10mph": 6400,
+      "max_vehicle_weight_15mph": 3200,
+      "notes": "Sedan at 15 mph/s"
+    },
+    {
+      "id": "gas_300cid",
+      "name": "300 cid",
+      "power_factors": 4000,
+      "weight_lbs": 825,
+      "motor_force": 14000,
+      "max_vehicle_weight_5mph": 12000,
+      "max_vehicle_weight_10mph": 8000,
+      "max_vehicle_weight_15mph": 4000,
+      "notes": "Luxury at 15 mph/s, van at 10 mph/s"
+    },
+    {
+      "id": "gas_350cid",
+      "name": "350 cid",
+      "power_factors": 5000,
+      "weight_lbs": 975,
+      "motor_force": 17500,
+      "max_vehicle_weight_5mph": 15000,
+      "max_vehicle_weight_10mph": 10000,
+      "max_vehicle_weight_15mph": 5000,
+      "notes": "Van at 15 mph/s"
+    },
+    {
+      "id": "gas_400cid",
+      "name": "400 cid",
+      "power_factors": 6300,
+      "weight_lbs": 1050,
+      "motor_force": 22050,
+      "max_vehicle_weight_5mph": 18900,
+      "max_vehicle_weight_10mph": 12600,
+      "max_vehicle_weight_15mph": 6300,
+      "notes": "Heavy vehicles at 15 mph/s"
+    },
+    {
+      "id": "gas_450cid",
+      "name": "450 cid",
+      "power_factors": 7800,
+      "weight_lbs": 1125,
+      "motor_force": 27300,
+      "max_vehicle_weight_5mph": 23400,
+      "max_vehicle_weight_10mph": 15600,
+      "max_vehicle_weight_15mph": 7800,
+      "notes": "Pickup at 15 mph/s"
+    },
+    {
+      "id": "gas_500cid",
+      "name": "500 cid",
+      "power_factors": 9500,
+      "weight_lbs": 1200,
+      "motor_force": 33250,
+      "max_vehicle_weight_5mph": 28500,
+      "max_vehicle_weight_10mph": 19000,
+      "max_vehicle_weight_15mph": 9500,
+      "notes": "Large trucks at 15 mph/s"
+    },
+    {
+      "id": "gas_700cid",
+      "name": "700 cid",
+      "power_factors": 13000,
+      "weight_lbs": 1275,
+      "motor_force": 45500,
+      "max_vehicle_weight_5mph": 39000,
+      "max_vehicle_weight_10mph": 26000,
+      "max_vehicle_weight_15mph": 13000,
+      "notes": "Semis and heavy trucks"
+    }
+  ],
+
+  "test_configurations": {
+    "_notes": "Recommended test setups for tuning motor_force values",
+    "compact_100cid": {
+      "chassis": "compact",
+      "engine": "gas_100cid",
+      "chassis_weight_lbs": 1300,
+      "engine_weight_lbs": 265,
+      "estimated_total_lbs": 1600,
+      "power_factors": 1300,
+      "pf_weight_ratio": 0.81,
+      "expected_class": "10 mph/s",
+      "target_0_60": 6.0
+    },
+    "compact_150cid": {
+      "chassis": "compact",
+      "engine": "gas_150cid",
+      "chassis_weight_lbs": 1300,
+      "engine_weight_lbs": 375,
+      "estimated_total_lbs": 1720,
+      "power_factors": 1900,
+      "pf_weight_ratio": 1.10,
+      "expected_class": "15 mph/s",
+      "target_0_60": 4.0
+    },
+    "mid_sized_200cid": {
+      "chassis": "mid_sized",
+      "engine": "gas_200cid",
+      "chassis_weight_lbs": 1600,
+      "engine_weight_lbs": 480,
+      "estimated_total_lbs": 2130,
+      "power_factors": 2500,
+      "pf_weight_ratio": 1.17,
+      "expected_class": "15 mph/s",
+      "target_0_60": 4.0
+    },
+    "sedan_250cid": {
+      "chassis": "sedan",
+      "engine": "gas_250cid",
+      "chassis_weight_lbs": 1700,
+      "engine_weight_lbs": 715,
+      "estimated_total_lbs": 2470,
+      "power_factors": 3200,
+      "pf_weight_ratio": 1.30,
+      "expected_class": "15 mph/s",
+      "target_0_60": 4.0
+    }
+  },
+
+  "tuning_formula": {
+    "_notes": "How to calculate required motor_force for target acceleration",
+    "formula": "motor_force = mass_kg * target_accel_ms2",
+    "example": {
+      "target_0_60_seconds": 6.0,
+      "target_accel_ms2": 4.47,
+      "vehicle_mass_kg": 725,
+      "required_motor_force": 3243
+    }
+  }
+}

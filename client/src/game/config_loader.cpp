@@ -548,65 +548,182 @@ bool config_load_vehicle(const char* filepath, VehicleJSON* out) {
         }
     }
 
-    // Parse drivetrain - look for axle_power with power_plant references
+    // Parse drivetrain - supports single_motor, dual_motor, and legacy formats
     cJSON* drivetrain = cJSON_GetObjectItem(root, "drivetrain");
     if (drivetrain) {
-        // Check for new axle_power format
-        cJSON* axle_power = cJSON_GetObjectItem(drivetrain, "axle_power");
-        if (axle_power && cJSON_IsArray(axle_power)) {
-            // New format: parse axle_power array for power plant references
-            cJSON* ap;
-            cJSON_ArrayForEach(ap, axle_power) {
-                char axle_id[32] = "";
-                json_get_string(ap, "axle", axle_id, 32, "");
+        // Check for drivetrain type field
+        char dt_type_str[32] = "";
+        json_get_string(drivetrain, "type", dt_type_str, 32, "");
 
-                // Mark axle as driven
-                for (int i = 0; i < out->axle_count; i++) {
-                    if (strcmp(out->axles[i].name, axle_id) == 0) {
-                        out->axles[i].driven = true;
-                    }
+        // Track combined power for Car Wars calculations
+        int total_power_factors = 0;
+        float total_motor_force = 0.0f;
+        float total_motor_weight_kg = 0.0f;
+        const char* power_plant_type = "electric";  // Default for top speed formula
+
+        if (strcmp(dt_type_str, "single_motor") == 0) {
+            // Single motor: power_plant + driven_axles
+            printf("  Drivetrain type: single_motor\n");
+
+            cJSON* pp_ref = cJSON_GetObjectItem(drivetrain, "power_plant");
+            if (pp_ref && cJSON_IsString(pp_ref)) {
+                const PowerPlantEquipment* pp = equipment_find_power_plant(pp_ref->valuestring);
+                if (pp) {
+                    total_motor_force = pp->motor_force;
+                    total_power_factors = pp->power_factors;
+                    total_motor_weight_kg = pp->weight_kg;
+                    power_plant_type = pp->type;
+                    printf("  Power Plant: %s (%.0fN, %d PF, %.0fkg)\n",
+                           pp->name, pp->motor_force, pp->power_factors, pp->weight_kg);
+                } else {
+                    fprintf(stderr, "Warning: Power plant '%s' not found\n", pp_ref->valuestring);
                 }
+            }
 
-                // Look up power plant
-                cJSON* pp_ref = cJSON_GetObjectItem(ap, "power_plant");
-                if (pp_ref && cJSON_IsString(pp_ref)) {
-                    const PowerPlantEquipment* pp = equipment_find_power_plant(pp_ref->valuestring);
-                    if (pp) {
-                        out->drivetrain.motor_force = pp->motor_force;
-                        // Add power plant weight to chassis mass for total vehicle mass
-                        out->chassis_mass += pp->weight_kg;
-                        out->physics.chassis_mass = out->chassis_mass;
-                        // Calculate top speed based on power plant type and total weight
-                        float est_weight = out->chassis_mass / LBS_TO_KG;  // Convert back to lbs for formula
-                        out->drivetrain.max_speed = equipment_calc_top_speed_ms(pp->type, pp->power_factors, (int)est_weight);
-                        printf("  Power Plant: %s (%.0fN motor, %.0fkg, %.1f m/s max)\n",
-                               pp->name, out->drivetrain.motor_force, pp->weight_kg, out->drivetrain.max_speed);
-                    } else {
-                        fprintf(stderr, "Warning: Power plant '%s' not found\n", pp_ref->valuestring);
+            // Parse driven_axles array
+            cJSON* driven_axles = cJSON_GetObjectItem(drivetrain, "driven_axles");
+            if (driven_axles && cJSON_IsArray(driven_axles)) {
+                cJSON* axle_ref;
+                cJSON_ArrayForEach(axle_ref, driven_axles) {
+                    if (cJSON_IsString(axle_ref)) {
+                        for (int i = 0; i < out->axle_count; i++) {
+                            if (strcmp(out->axles[i].name, axle_ref->valuestring) == 0) {
+                                out->axles[i].driven = true;
+                            }
+                        }
                     }
                 }
             }
 
-            // Determine drivetrain type from which axles are driven
-            int front_driven = 0, rear_driven = 0;
-            for (int i = 0; i < out->axle_count; i++) {
-                if (out->axles[i].driven) {
-                    if (strcmp(out->axles[i].name, "front") == 0) front_driven = 1;
-                    if (strcmp(out->axles[i].name, "rear") == 0) rear_driven = 1;
+        } else if (strcmp(dt_type_str, "dual_motor") == 0) {
+            // Dual motor: motors array with one motor per axle
+            printf("  Drivetrain type: dual_motor\n");
+
+            cJSON* motors = cJSON_GetObjectItem(drivetrain, "motors");
+            if (motors && cJSON_IsArray(motors)) {
+                cJSON* motor;
+                cJSON_ArrayForEach(motor, motors) {
+                    char axle_id[32] = "";
+                    json_get_string(motor, "axle", axle_id, 32, "");
+
+                    // Mark axle as driven
+                    for (int i = 0; i < out->axle_count; i++) {
+                        if (strcmp(out->axles[i].name, axle_id) == 0) {
+                            out->axles[i].driven = true;
+                        }
+                    }
+
+                    // Look up power plant and SUM values
+                    cJSON* pp_ref = cJSON_GetObjectItem(motor, "power_plant");
+                    if (pp_ref && cJSON_IsString(pp_ref)) {
+                        const PowerPlantEquipment* pp = equipment_find_power_plant(pp_ref->valuestring);
+                        if (pp) {
+                            total_motor_force += pp->motor_force;  // SUM motor forces
+                            total_power_factors += pp->power_factors;  // SUM power factors
+                            total_motor_weight_kg += pp->weight_kg;  // SUM weights
+                            power_plant_type = pp->type;  // Use last motor's type
+                            printf("    Motor [%s]: %s (%.0fN, %d PF, %.0fkg)\n",
+                                   axle_id, pp->name, pp->motor_force, pp->power_factors, pp->weight_kg);
+                        } else {
+                            fprintf(stderr, "Warning: Power plant '%s' not found\n", pp_ref->valuestring);
+                        }
+                    }
                 }
+                printf("  Combined: %.0fN total, %d PF, %.0fkg\n",
+                       total_motor_force, total_power_factors, total_motor_weight_kg);
             }
-            if (front_driven && rear_driven) out->drivetrain.type = DRIVETRAIN_AWD;
-            else if (front_driven) out->drivetrain.type = DRIVETRAIN_FWD;
-            else out->drivetrain.type = DRIVETRAIN_RWD;
+
         } else {
-            // Legacy format: direct values
-            char dt_type[16];
-            json_get_string(drivetrain, "type", dt_type, 16, "RWD");
-            out->drivetrain.type = parse_drivetrain_type(dt_type);
-            out->drivetrain.motor_force = json_get_float(drivetrain, "motor_force", out->drivetrain.motor_force);
-            out->drivetrain.brake_force = json_get_float(drivetrain, "brake_force", out->drivetrain.brake_force);
-            out->drivetrain.max_speed = json_get_float(drivetrain, "max_speed", out->drivetrain.max_speed);
+            // Legacy format or direct values
+            // Check for old axle_power format (backwards compatibility)
+            cJSON* axle_power = cJSON_GetObjectItem(drivetrain, "axle_power");
+            if (axle_power && cJSON_IsArray(axle_power)) {
+                printf("  Drivetrain: legacy axle_power format (consider updating to type: dual_motor)\n");
+                cJSON* ap;
+                cJSON_ArrayForEach(ap, axle_power) {
+                    char axle_id[32] = "";
+                    json_get_string(ap, "axle", axle_id, 32, "");
+
+                    for (int i = 0; i < out->axle_count; i++) {
+                        if (strcmp(out->axles[i].name, axle_id) == 0) {
+                            out->axles[i].driven = true;
+                        }
+                    }
+
+                    cJSON* pp_ref = cJSON_GetObjectItem(ap, "power_plant");
+                    if (pp_ref && cJSON_IsString(pp_ref)) {
+                        const PowerPlantEquipment* pp = equipment_find_power_plant(pp_ref->valuestring);
+                        if (pp) {
+                            // Legacy: SUM like dual_motor
+                            total_motor_force += pp->motor_force;
+                            total_power_factors += pp->power_factors;
+                            total_motor_weight_kg += pp->weight_kg;
+                            power_plant_type = pp->type;
+                        }
+                    }
+                }
+            } else {
+                // Direct values (oldest format)
+                out->drivetrain.type = parse_drivetrain_type(dt_type_str);
+                out->drivetrain.motor_force = json_get_float(drivetrain, "motor_force", out->drivetrain.motor_force);
+                out->drivetrain.brake_force = json_get_float(drivetrain, "brake_force", out->drivetrain.brake_force);
+                out->drivetrain.max_speed = json_get_float(drivetrain, "max_speed", out->drivetrain.max_speed);
+            }
         }
+
+        // Apply combined motor values
+        if (total_motor_force > 0) {
+            out->drivetrain.motor_force = total_motor_force;
+            out->chassis_mass += total_motor_weight_kg;
+            out->physics.chassis_mass = out->chassis_mass;
+
+            // Calculate top speed based on combined power factors
+            float est_weight = out->chassis_mass / LBS_TO_KG;
+            out->drivetrain.max_speed = equipment_calc_top_speed_ms(power_plant_type, total_power_factors, (int)est_weight);
+            printf("  Top Speed: %.1f m/s (%.0f mph)\n",
+                   out->drivetrain.max_speed, out->drivetrain.max_speed * 2.237f);
+
+            // Calculate Car Wars acceleration target from PF/weight ratio
+            // Store in physics config for acceleration test
+            out->physics.power_factors = total_power_factors;
+            strncpy(out->physics.vehicle_name, out->name, 63);
+            out->physics.vehicle_name[63] = '\0';
+
+            float pf_weight_ratio = (float)total_power_factors / est_weight;
+            // Car Wars acceleration classes:
+            // 15 mph/s: ratio >= 1.0, target 0-60 = 4.0s
+            // 10 mph/s: ratio >= 0.5, target 0-60 = 6.0s
+            // 5 mph/s:  ratio >= 0.333, target 0-60 = 12.0s
+            if (pf_weight_ratio >= 1.0f) {
+                out->physics.target_0_60_seconds = 4.0f;
+                out->physics.target_accel_ms2 = 6.71f;  // 26.82 m/s / 4.0s
+            } else if (pf_weight_ratio >= 0.5f) {
+                out->physics.target_0_60_seconds = 6.0f;
+                out->physics.target_accel_ms2 = 4.47f;  // 26.82 m/s / 6.0s
+            } else if (pf_weight_ratio >= 0.333f) {
+                out->physics.target_0_60_seconds = 12.0f;
+                out->physics.target_accel_ms2 = 2.24f;  // 26.82 m/s / 12.0s
+            } else {
+                // Below 5 mph/s class - use 5 mph/s as minimum
+                out->physics.target_0_60_seconds = 12.0f;
+                out->physics.target_accel_ms2 = 2.24f;
+            }
+            printf("  Accel Target: %.1fs 0-60 (PF/wt=%.2f, class=%d mph/s)\n",
+                   out->physics.target_0_60_seconds, pf_weight_ratio,
+                   (int)(26.82f / out->physics.target_0_60_seconds * 2.237f));
+        }
+
+        // Determine drivetrain type label from which axles are driven
+        int front_driven = 0, rear_driven = 0;
+        for (int i = 0; i < out->axle_count; i++) {
+            if (out->axles[i].driven) {
+                if (strcmp(out->axles[i].name, "front") == 0) front_driven = 1;
+                if (strcmp(out->axles[i].name, "rear") == 0) rear_driven = 1;
+            }
+        }
+        if (front_driven && rear_driven) out->drivetrain.type = DRIVETRAIN_AWD;
+        else if (front_driven) out->drivetrain.type = DRIVETRAIN_FWD;
+        else out->drivetrain.type = DRIVETRAIN_RWD;
     }
 
     // Calculate brake force from axle brake multipliers and chassis mass
@@ -846,4 +963,268 @@ bool config_load_scene(const char* filepath, SceneJSON* out) {
     printf("Loaded scene config: %s (%d vehicles, %d obstacles)\n",
            out->name, out->vehicle_count, out->obstacle_count);
     return true;
+}
+
+// ============================================================================
+// Physics Mode Loading
+// ============================================================================
+
+// Global active physics mode
+static PhysicsMode s_active_physics_mode = {
+    .name = "Strict Car Wars",
+    .type = PHYSICS_MODE_STRICT_CAR_WARS,
+    .overrides = {
+        .drivetrain = DRIVETRAIN_AWD,
+        .override_drivetrain = true,
+        .tire = { .mu = 2.0f, .reference_radius = 0.35f, .reference_width = 0.2f },
+        .override_tire = true,
+        .suspension = { .frequency = 3.0f, .damping = 0.8f, .travel = 0.15f },
+        .override_suspension = true
+    }
+};
+
+bool config_load_physics_mode(const char* filepath, PhysicsMode* out) {
+    // Set defaults (strict mode)
+    memset(out, 0, sizeof(*out));
+    strcpy(out->name, "Strict Car Wars");
+    out->type = PHYSICS_MODE_STRICT_CAR_WARS;
+    out->overrides.drivetrain = DRIVETRAIN_AWD;
+    out->overrides.override_drivetrain = true;
+    out->overrides.tire.mu = 2.0f;
+    out->overrides.tire.reference_radius = 0.35f;
+    out->overrides.tire.reference_width = 0.2f;
+    out->overrides.override_tire = true;
+    out->overrides.suspension.frequency = 3.0f;
+    out->overrides.suspension.damping = 0.8f;
+    out->overrides.suspension.travel = 0.15f;
+    out->overrides.override_suspension = true;
+
+    char* json_str = read_file(filepath);
+    if (!json_str) {
+        fprintf(stderr, "Warning: Physics mode config not found: %s (using strict defaults)\n", filepath);
+        s_active_physics_mode = *out;
+        return false;
+    }
+
+    cJSON* root = cJSON_Parse(json_str);
+    free(json_str);
+
+    if (!root) {
+        fprintf(stderr, "JSON parse error in %s\n", filepath);
+        s_active_physics_mode = *out;
+        return false;
+    }
+
+    // Get active mode name
+    char active_mode[64] = "strict_car_wars";
+    json_get_string(root, "active_mode", active_mode, 64, "strict_car_wars");
+
+    // Parse modes
+    cJSON* modes = cJSON_GetObjectItem(root, "modes");
+    if (!modes) {
+        cJSON_Delete(root);
+        s_active_physics_mode = *out;
+        return false;
+    }
+
+    // Get the active mode config
+    cJSON* mode_config = cJSON_GetObjectItem(modes, active_mode);
+    if (!mode_config) {
+        fprintf(stderr, "Warning: Physics mode '%s' not found, using strict defaults\n", active_mode);
+        cJSON_Delete(root);
+        s_active_physics_mode = *out;
+        return false;
+    }
+
+    // Parse mode name and type
+    json_get_string(mode_config, "name", out->name, MAX_NAME_LENGTH, "Unknown");
+    if (strcmp(active_mode, "extended") == 0) {
+        out->type = PHYSICS_MODE_EXTENDED;
+        // Extended mode has no overrides by default
+        out->overrides.override_drivetrain = false;
+        out->overrides.override_tire = false;
+        out->overrides.override_suspension = false;
+    } else {
+        out->type = PHYSICS_MODE_STRICT_CAR_WARS;
+    }
+
+    // Parse overrides
+    cJSON* overrides = cJSON_GetObjectItem(mode_config, "overrides");
+    if (overrides) {
+        // Drivetrain override
+        cJSON* dt = cJSON_GetObjectItem(overrides, "drivetrain");
+        if (dt && cJSON_IsString(dt)) {
+            out->overrides.override_drivetrain = true;
+            if (strcmp(dt->valuestring, "AWD") == 0) out->overrides.drivetrain = DRIVETRAIN_AWD;
+            else if (strcmp(dt->valuestring, "FWD") == 0) out->overrides.drivetrain = DRIVETRAIN_FWD;
+            else if (strcmp(dt->valuestring, "RWD") == 0) out->overrides.drivetrain = DRIVETRAIN_RWD;
+            else if (strcmp(dt->valuestring, "4WD") == 0) out->overrides.drivetrain = DRIVETRAIN_4WD;
+        }
+
+        // Tire overrides
+        cJSON* tire = cJSON_GetObjectItem(overrides, "tire");
+        if (tire && cJSON_IsObject(tire)) {
+            out->overrides.override_tire = true;
+            out->overrides.tire.mu = json_get_float(tire, "mu", 2.0f);
+            out->overrides.tire.reference_radius = json_get_float(tire, "reference_radius", 0.35f);
+            out->overrides.tire.reference_width = json_get_float(tire, "reference_width", 0.2f);
+        }
+
+        // Suspension overrides
+        cJSON* susp = cJSON_GetObjectItem(overrides, "suspension");
+        if (susp && cJSON_IsObject(susp)) {
+            out->overrides.override_suspension = true;
+            out->overrides.suspension.frequency = json_get_float(susp, "frequency", 3.0f);
+            out->overrides.suspension.damping = json_get_float(susp, "damping", 0.8f);
+            out->overrides.suspension.travel = json_get_float(susp, "travel", 0.15f);
+        }
+
+        // Transmission overrides
+        cJSON* trans = cJSON_GetObjectItem(overrides, "transmission");
+        if (trans && cJSON_IsObject(trans)) {
+            out->overrides.override_transmission = true;
+
+            // Parse gear ratios array
+            cJSON* gear_ratios = cJSON_GetObjectItem(trans, "gear_ratios");
+            out->overrides.transmission.gear_count = 0;
+            if (gear_ratios && cJSON_IsArray(gear_ratios)) {
+                cJSON* ratio;
+                cJSON_ArrayForEach(ratio, gear_ratios) {
+                    if (out->overrides.transmission.gear_count < MAX_TRANSMISSION_GEARS && cJSON_IsNumber(ratio)) {
+                        out->overrides.transmission.gear_ratios[out->overrides.transmission.gear_count++] = (float)ratio->valuedouble;
+                    }
+                }
+            }
+
+            // Parse reverse ratios array
+            cJSON* reverse_ratios = cJSON_GetObjectItem(trans, "reverse_ratios");
+            out->overrides.transmission.reverse_count = 0;
+            if (reverse_ratios && cJSON_IsArray(reverse_ratios)) {
+                cJSON* ratio;
+                cJSON_ArrayForEach(ratio, reverse_ratios) {
+                    if (out->overrides.transmission.reverse_count < MAX_TRANSMISSION_GEARS && cJSON_IsNumber(ratio)) {
+                        out->overrides.transmission.reverse_ratios[out->overrides.transmission.reverse_count++] = (float)ratio->valuedouble;
+                    }
+                }
+            }
+
+            out->overrides.transmission.differential_ratio = json_get_float(trans, "differential_ratio", 1.29f);
+        }
+    }
+
+    cJSON_Delete(root);
+
+    // Store as active mode
+    s_active_physics_mode = *out;
+
+    printf("Loaded physics mode: %s (%s)\n", out->name,
+           out->type == PHYSICS_MODE_STRICT_CAR_WARS ? "strict" : "extended");
+    if (out->overrides.override_drivetrain) {
+        const char* dt_names[] = {"RWD", "FWD", "AWD", "4WD"};
+        printf("  Drivetrain label: %s (informational - physics from axle_power)\n", dt_names[out->overrides.drivetrain]);
+    }
+    if (out->overrides.override_tire) {
+        printf("  Tire override: mu=%.2f, ref_radius=%.2f\n",
+               out->overrides.tire.mu, out->overrides.tire.reference_radius);
+    }
+    if (out->overrides.override_suspension) {
+        printf("  Suspension override: freq=%.1f, damp=%.2f, travel=%.2f\n",
+               out->overrides.suspension.frequency,
+               out->overrides.suspension.damping,
+               out->overrides.suspension.travel);
+    }
+    if (out->overrides.override_transmission) {
+        printf("  Transmission override: %d gears, diff=%.2f\n",
+               out->overrides.transmission.gear_count,
+               out->overrides.transmission.differential_ratio);
+    }
+
+    return true;
+}
+
+const PhysicsMode* config_get_physics_mode(void) {
+    return &s_active_physics_mode;
+}
+
+bool config_is_strict_mode(void) {
+    return s_active_physics_mode.type == PHYSICS_MODE_STRICT_CAR_WARS;
+}
+
+void config_apply_physics_mode(VehicleJSON* vehicle, const PhysicsMode* mode) {
+    if (!mode) return;
+
+    printf("  Applying physics mode: %s\n", mode->name);
+
+    // Drivetrain label is informational only (for UI/rules display)
+    // Actual wheel_driven[] is determined by axle_power in vehicle config
+    if (mode->overrides.override_drivetrain) {
+        vehicle->drivetrain.type = mode->overrides.drivetrain;
+        const char* dt_names[] = {"RWD", "FWD", "AWD", "4WD"};
+        printf("    -> Drivetrain label: %s (informational only - physics uses axle_power)\n",
+               dt_names[mode->overrides.drivetrain]);
+    }
+
+    // Apply tire override
+    if (mode->overrides.override_tire) {
+        vehicle->defaults.wheel.friction = mode->overrides.tire.mu;
+        vehicle->physics.tire_friction = mode->overrides.tire.mu;
+        printf("    -> Tire friction: %.2f\n", mode->overrides.tire.mu);
+    }
+
+    // Apply suspension override
+    if (mode->overrides.override_suspension) {
+        vehicle->defaults.suspension.frequency = mode->overrides.suspension.frequency;
+        vehicle->defaults.suspension.damping = mode->overrides.suspension.damping;
+        vehicle->defaults.suspension.travel = mode->overrides.suspension.travel;
+
+        vehicle->physics.suspension_frequency = mode->overrides.suspension.frequency;
+        vehicle->physics.suspension_damping = mode->overrides.suspension.damping;
+        vehicle->physics.suspension_travel = mode->overrides.suspension.travel;
+
+        // Update per-wheel suspension
+        for (int i = 0; i < 4; i++) {
+            vehicle->physics.wheel_suspension_frequency[i] = mode->overrides.suspension.frequency;
+            vehicle->physics.wheel_suspension_damping[i] = mode->overrides.suspension.damping;
+            vehicle->physics.wheel_suspension_travel[i] = mode->overrides.suspension.travel;
+        }
+        printf("    -> Suspension: freq=%.1f, damp=%.2f\n",
+               mode->overrides.suspension.frequency,
+               mode->overrides.suspension.damping);
+    }
+
+    // In strict Car Wars mode, use linear acceleration mode
+    // This bypasses the engine simulation entirely and applies direct force F = m * a
+    // Gives constant acceleration regardless of speed (per Car Wars rules - no air resistance)
+    if (mode->type == PHYSICS_MODE_STRICT_CAR_WARS && vehicle->physics.target_accel_ms2 > 0.0f) {
+        float mass_kg = vehicle->physics.chassis_mass;
+        float target_accel = vehicle->physics.target_accel_ms2;
+
+        // Enable linear acceleration mode
+        vehicle->physics.use_linear_accel = true;
+        vehicle->physics.linear_accel_force = mass_kg * target_accel;
+
+        // Top speed from Car Wars tables (max_speed is in m/s)
+        vehicle->physics.top_speed_ms = vehicle->drivetrain.max_speed;
+
+        printf("    -> Linear accel mode: F=%.0fN (mass=%.0fkg * accel=%.2f m/s²)\n",
+               vehicle->physics.linear_accel_force, mass_kg, target_accel);
+        printf("       Top speed limit: %.1f m/s (%.0f mph)\n",
+               vehicle->physics.top_speed_ms, vehicle->physics.top_speed_ms * 2.237f);
+    }
+
+    // Apply transmission override
+    if (mode->overrides.override_transmission) {
+        vehicle->physics.use_config_transmission = true;
+        vehicle->physics.gear_count = mode->overrides.transmission.gear_count;
+        for (int i = 0; i < mode->overrides.transmission.gear_count; i++) {
+            vehicle->physics.gear_ratios[i] = mode->overrides.transmission.gear_ratios[i];
+        }
+        vehicle->physics.reverse_count = mode->overrides.transmission.reverse_count;
+        for (int i = 0; i < mode->overrides.transmission.reverse_count; i++) {
+            vehicle->physics.reverse_ratios[i] = mode->overrides.transmission.reverse_ratios[i];
+        }
+        vehicle->physics.differential_ratio = mode->overrides.transmission.differential_ratio;
+        printf("    -> Transmission: %d gears, diff=%.2f\n",
+               vehicle->physics.gear_count, vehicle->physics.differential_ratio);
+    }
 }

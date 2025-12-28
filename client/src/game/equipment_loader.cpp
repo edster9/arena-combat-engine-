@@ -133,7 +133,10 @@ static bool load_power_plants(const char* filepath) {
                 p->spaces = json_get_int(item, "spaces", 0); \
                 p->power_factors = json_get_int(item, "power_factors", 0); \
                 p->power_units = json_get_int(item, "power_units", 0); \
-                p->motor_force = p->power_factors * POWER_FACTOR_TO_FORCE; \
+                p->motor_force = json_get_float(item, "motor_force", 0); \
+                if (p->motor_force <= 0) { \
+                    p->motor_force = p->power_factors * POWER_FACTOR_TO_FORCE; \
+                } \
                 p->weight_kg = p->weight_lbs * LBS_TO_KG; \
                 g_equipment.power_plant_count++; \
             } \
@@ -290,6 +293,77 @@ static bool load_brakes(const char* filepath) {
     return true;
 }
 
+// Load gearboxes.json
+static bool load_gearboxes(const char* filepath) {
+    char* json_str = read_file(filepath);
+    if (!json_str) return false;
+
+    cJSON* root = cJSON_Parse(json_str);
+    free(json_str);
+    if (!root) { fprintf(stderr, "Equipment: JSON parse error in gearboxes.json\n"); return false; }
+
+    cJSON* types = cJSON_GetObjectItem(root, "types");
+    if (types) {
+        cJSON* item;
+        cJSON_ArrayForEach(item, types) {
+            if (g_equipment.gearbox_count >= MAX_EQUIPMENT_ITEMS) break;
+            GearboxEquipment* g = &g_equipment.gearboxes[g_equipment.gearbox_count];
+
+            json_get_string(item, "id", g->id, MAX_EQUIPMENT_ID, item->string);
+            json_get_string(item, "name", g->name, MAX_EQUIPMENT_NAME, "Unknown");
+            g->cost = json_get_int(item, "cost", 0);
+            g->weight_lbs = json_get_int(item, "weight_lbs", 0);
+
+            cJSON* physics = cJSON_GetObjectItem(item, "physics");
+            if (physics) {
+                // Parse gear ratios array
+                cJSON* gear_ratios = cJSON_GetObjectItem(physics, "gear_ratios");
+                g->gear_count = 0;
+                if (gear_ratios && cJSON_IsArray(gear_ratios)) {
+                    cJSON* ratio;
+                    cJSON_ArrayForEach(ratio, gear_ratios) {
+                        if (g->gear_count < MAX_GEARS && cJSON_IsNumber(ratio)) {
+                            g->gear_ratios[g->gear_count++] = (float)ratio->valuedouble;
+                        }
+                    }
+                }
+
+                // Parse reverse ratios array
+                cJSON* reverse_ratios = cJSON_GetObjectItem(physics, "reverse_ratios");
+                g->reverse_count = 0;
+                if (reverse_ratios && cJSON_IsArray(reverse_ratios)) {
+                    cJSON* ratio;
+                    cJSON_ArrayForEach(ratio, reverse_ratios) {
+                        if (g->reverse_count < MAX_GEARS && cJSON_IsNumber(ratio)) {
+                            g->reverse_ratios[g->reverse_count++] = (float)ratio->valuedouble;
+                        }
+                    }
+                }
+
+                g->differential_ratio = json_get_float(physics, "differential_ratio", 1.29f);
+                g->shift_up_rpm = json_get_float(physics, "shift_up_rpm", 4500.0f);
+                g->shift_down_rpm = json_get_float(physics, "shift_down_rpm", 2000.0f);
+            } else {
+                // Defaults
+                g->gear_ratios[0] = 1.5f; g->gear_ratios[1] = 1.2f;
+                g->gear_ratios[2] = 1.0f; g->gear_ratios[3] = 0.85f;
+                g->gear_ratios[4] = 0.7f;
+                g->gear_count = 5;
+                g->reverse_ratios[0] = -1.5f;
+                g->reverse_count = 1;
+                g->differential_ratio = 1.29f;
+                g->shift_up_rpm = 4500.0f;
+                g->shift_down_rpm = 2000.0f;
+            }
+            g_equipment.gearbox_count++;
+        }
+    }
+
+    cJSON_Delete(root);
+    printf("Equipment: Loaded %d gearbox types\n", g_equipment.gearbox_count);
+    return true;
+}
+
 // Load all equipment (can be called multiple times for reload)
 bool equipment_load_all(const char* base_path) {
     // Reset and reload
@@ -312,6 +386,9 @@ bool equipment_load_all(const char* base_path) {
 
     snprintf(path, sizeof(path), "%s/brakes.json", base_path);
     if (!load_brakes(path)) success = false;
+
+    snprintf(path, sizeof(path), "%s/gearboxes.json", base_path);
+    if (!load_gearboxes(path)) success = false;
 
     g_equipment.loaded = success;
     return success;
@@ -373,6 +450,16 @@ const BrakeEquipment* equipment_find_brake(const char* id) {
     for (int i = 0; i < g_equipment.brake_count; i++) {
         if (strcmp(g_equipment.brakes[i].id, id) == 0) {
             return &g_equipment.brakes[i];
+        }
+    }
+    return NULL;
+}
+
+const GearboxEquipment* equipment_find_gearbox(const char* id) {
+    if (!id) return NULL;
+    for (int i = 0; i < g_equipment.gearbox_count; i++) {
+        if (strcmp(g_equipment.gearboxes[i].id, id) == 0) {
+            return &g_equipment.gearboxes[i];
         }
     }
     return NULL;

@@ -56,12 +56,33 @@ typedef struct {
     float engine_max_torque; // Nm
     float engine_max_rpm;    // Max RPM
 
+    // Transmission/gearbox
+    #define MAX_CONFIG_GEARS 8
+    float gear_ratios[MAX_CONFIG_GEARS];
+    int gear_count;
+    float reverse_ratios[MAX_CONFIG_GEARS];
+    int reverse_count;
+    float differential_ratio;
+    bool use_config_transmission;  // If true, use these values instead of hardcoded
+
     // Tire properties
     float tire_friction;     // Friction coefficient (mu), higher = more grip
 
     // Legacy values for compatibility
     float max_motor_force;   // Will be converted to torque
     float max_brake_force;   // Brake force (Newtons)
+
+    // Car Wars acceleration targets (for tuning/testing)
+    int power_factors;            // Total power factors from power plant(s)
+    float target_accel_ms2;       // Target acceleration in m/s² (from PF/weight ratio)
+    float target_0_60_seconds;    // Target 0-60 time in seconds
+    char vehicle_name[64];        // Vehicle name for test output
+
+    // Car Wars linear acceleration mode
+    // When enabled, bypasses engine simulation and applies constant F = m * a
+    bool use_linear_accel;        // Enable direct force application
+    float linear_accel_force;     // Force in Newtons (mass * target_accel)
+    float top_speed_ms;           // Top speed limit in m/s (from Car Wars tables)
 
     // Wheel mount points (legacy - used if wheel_positions all zero)
     float wheelbase;         // Distance between front and rear axles
@@ -108,7 +129,8 @@ typedef struct {
 
     // Acceleration test state
     bool accel_test_active;
-    float accel_test_elapsed;    // Time since test started (seconds)
+    bool accel_test_timing_started;  // True once throttle is applied
+    float accel_test_elapsed;    // Time since timing started (seconds)
     float accel_test_print_timer; // Timer for periodic output
     Vec3 accel_test_start_pos;
     float accel_test_last_speed;
@@ -149,6 +171,7 @@ void physics_vehicle_set_throttle(PhysicsWorld* pw, int vehicle_id, float thrott
 void physics_vehicle_set_reverse(PhysicsWorld* pw, int vehicle_id, float reverse);    // 0 to 1
 void physics_vehicle_set_brake(PhysicsWorld* pw, int vehicle_id, float brake);        // 0 to 1
 void physics_vehicle_respawn(PhysicsWorld* pw, int vehicle_id);  // Reset to spawn position
+void physics_vehicle_start_accel_test(PhysicsWorld* pw, int vehicle_id);  // Start 0-60 acceleration test
 
 // Get vehicle state (for rendering)
 void physics_vehicle_get_position(PhysicsWorld* pw, int vehicle_id, Vec3* pos);

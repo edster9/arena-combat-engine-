@@ -13,8 +13,10 @@
       "Cycle tires cost same but weigh half as much"
     ],
     "physics_values": {
-      "_notes": "Physics traction values - internal tuning, not part of CW car building",
-      "mu": "Friction coefficient (0-3+) - higher = more grip (Jolt handles slip internally)"
+      "_notes": "Physics traction - standardized across all tires to match Car Wars (tires don't affect acceleration)",
+      "mu": "Friction coefficient - SAME for all tire types (2.0). Tire choice affects handling/damage, not accel.",
+      "tuning_note": "mu=2.0 balanced with gear ratios to achieve Car Wars 10 mph/s acceleration",
+      "future_extension": "If adding realistic tire physics later, could add optional mu_override per tire"
     }
   },
 
@@ -28,7 +30,7 @@
       "spike_damage_modifier": 1.0,
       "debris_damage_modifier": 1.0,
       "physics": {
-        "mu": 1.5
+        "mu": 2.0
       }
     },
     "heavy_duty": {
@@ -40,7 +42,7 @@
       "spike_damage_modifier": 1.0,
       "debris_damage_modifier": 1.0,
       "physics": {
-        "mu": 1.5
+        "mu": 2.0
       }
     },
     "puncture_resistant": {
@@ -52,7 +54,7 @@
       "spike_damage_modifier": 1.0,
       "debris_damage_modifier": 1.0,
       "physics": {
-        "mu": 1.4
+        "mu": 2.0
       }
     },
     "solid": {
@@ -64,7 +66,7 @@
       "spike_damage_modifier": 0.5,
       "debris_damage_modifier": 0.0,
       "physics": {
-        "mu": 1.2
+        "mu": 2.0
       },
       "notes": "Half damage from spikes, immune to debris"
     },
@@ -78,7 +80,7 @@
       "debris_damage_modifier": 1.0,
       "core_dp": 21,
       "physics": {
-        "mu": 1.3
+        "mu": 2.0
       },
       "notes": "After 4 DP damage, rubber strips off exposing core. HC drops by 1 when any tire exposed. Cannot be radial or off-road. Cannot be steelbelted."
     }
@@ -102,7 +104,7 @@
       "dp_modifier": -1,
       "hc_bonus": 1,
       "physics_modifier": {
-        "mu_bonus": 0.1
+        "mu_bonus": 0
       },
       "compatible_with": ["standard", "heavy_duty", "puncture_resistant", "solid"],
       "notes": "Must be on all wheels for HC bonus. Applied after steelbelting."
@@ -115,10 +117,10 @@
       "hc_bonus_offroad": 1,
       "no_terrain_damage": true,
       "physics_modifier": {
-        "mu_bonus": -0.2
+        "mu_bonus": 0
       },
       "compatible_with": ["standard", "heavy_duty", "puncture_resistant", "solid"],
-      "notes": "Must be on all wheels. No bonus on highway. Cannot combine with radial. Less grip on pavement."
+      "notes": "Must be on all wheels. No bonus on highway. Cannot combine with radial."
     },
     "racing_slick": {
       "id": "mod_racing_slick",
@@ -135,10 +137,10 @@
       "road_wear_damage": 1,
       "road_wear_interval_minutes": 10,
       "physics_modifier": {
-        "mu_bonus": 0.5
+        "mu_bonus": 0
       },
       "compatible_with": ["standard", "heavy_duty", "puncture_resistant", "solid"],
-      "notes": "HC +2 if on all wheels, +1 if front or back only. D3 hazard just hitting oil/ice/water. Takes double damage from spikes/debris. 1 DP per 10 min on regular roads. Best dry grip."
+      "notes": "HC +2 if on all wheels, +1 if front or back only. D3 hazard just hitting oil/ice/water. Takes double damage from spikes/debris. 1 DP per 10 min on regular roads."
     },
     "fireproof": {
       "id": "mod_fireproof",

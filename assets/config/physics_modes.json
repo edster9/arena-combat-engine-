@@ -1,0 +1,70 @@
+{
+  "_meta": {
+    "description": "Physics mode configuration for Car Wars compliance vs extended physics",
+    "notes": "In strict mode, certain physics parameters are overridden to ensure Car Wars rule compliance"
+  },
+
+  "active_mode": "strict_car_wars",
+
+  "modes": {
+    "strict_car_wars": {
+      "name": "Strict Car Wars",
+      "description": "Enforces Car Wars tabletop rules - acceleration based purely on power_factors/weight ratio",
+
+      "overrides": {
+        "drivetrain": "AWD",
+        "tire": {
+          "mu": 6.0,
+          "reference_radius": 0.35,
+          "reference_width": 0.2
+        },
+        "suspension": {
+          "frequency": 3.0,
+          "damping": 0.8,
+          "travel": 0.15
+        },
+        "transmission": {
+          "_notes": "Per power plant type transmission overrides. Loader checks type from power_plants.json",
+          "_default": {
+            "gear_ratios": [1.5, 1.2, 1.0, 0.85, 0.7],
+            "reverse_ratios": [-1.5],
+            "differential_ratio": 1.29
+          },
+          "gas": {
+            "gear_ratios": [1.5, 1.2, 1.0, 0.85, 0.7],
+            "reverse_ratios": [-1.5],
+            "differential_ratio": 1.29
+          },
+          "electric": {
+            "gear_ratios": [1.0],
+            "reverse_ratios": [-1.0],
+            "differential_ratio": 9.0
+          },
+          "nuclear": {
+            "gear_ratios": [1.0],
+            "reverse_ratios": [-1.0],
+            "differential_ratio": 9.0
+          }
+        }
+      },
+
+      "chassis_overrides": {
+        "_notes": "Per-chassis class overrides (optional, merged on top of base overrides)",
+        "cycles": {
+          "drivetrain": "RWD"
+        },
+        "trikes": {
+          "drivetrain": "RWD"
+        }
+      }
+    },
+
+    "extended": {
+      "name": "Extended Physics",
+      "description": "Full physics simulation with configurable parameters",
+
+      "overrides": {
+      }
+    }
+  }
+}

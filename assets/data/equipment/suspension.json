@@ -8,9 +8,11 @@
       "Suspension adds no weight and takes no space"
     ],
     "physics_values": {
-      "frequency": "Spring frequency in Hz - higher = stiffer (1.0-3.0 typical)",
-      "damping": "Damping ratio (0-1) - 0.5 = critical damping",
-      "travel": "Suspension travel in meters"
+      "_notes": "Physics values standardized for stable handling - suspension choice affects HC/dice, not physics",
+      "frequency": "Spring frequency in Hz - SAME for all types (3.0 = very stiff)",
+      "damping": "Damping ratio - SAME for all types (0.8 = well damped)",
+      "travel": "Suspension travel - SAME for all types (0.10m)",
+      "design_philosophy": "Cars stay stable during normal play. Disasters triggered by dice rolls apply external forces."
     }
   },
 
@@ -23,11 +25,11 @@
       "hc_van": 0,
       "hc_subcompact": 2,
       "physics": {
-        "frequency": 1.0,
-        "damping": 0.3,
-        "travel": 0.18
+        "frequency": 3.0,
+        "damping": 0.8,
+        "travel": 0.10
       },
-      "notes": "Standard/default suspension. Soft, more body roll."
+      "notes": "Standard/default suspension. HC determines handling outcomes."
     },
     "improved": {
       "id": "suspension_improved",
@@ -37,11 +39,11 @@
       "hc_van": 1,
       "hc_subcompact": 3,
       "physics": {
-        "frequency": 1.5,
-        "damping": 0.5,
-        "travel": 0.12
+        "frequency": 3.0,
+        "damping": 0.8,
+        "travel": 0.10
       },
-      "notes": "Costs 100% of body cost. Balanced handling."
+      "notes": "Costs 100% of body cost. +1 HC over light."
     },
     "heavy": {
       "id": "suspension_heavy",
@@ -51,11 +53,11 @@
       "hc_van": 2,
       "hc_subcompact": 4,
       "physics": {
-        "frequency": 2.5,
+        "frequency": 3.0,
         "damping": 0.8,
-        "travel": 0.08
+        "travel": 0.10
       },
-      "notes": "Costs 150% of body cost. Stiff, minimal body roll."
+      "notes": "Costs 150% of body cost. +2 HC over light."
     },
     "off_road": {
       "id": "suspension_off_road",
@@ -67,11 +69,11 @@
       "hc_offroad_bonus": 1,
       "negates_offroad_penalty": true,
       "physics": {
-        "frequency": 1.0,
-        "damping": 0.4,
-        "travel": 0.30
+        "frequency": 3.0,
+        "damping": 0.8,
+        "travel": 0.10
       },
-      "notes": "Costs 500% of body cost. Very soft, long travel for rough terrain."
+      "notes": "Costs 500% of body cost. +1 HC off-road, negates terrain penalties."
     }
   },
 

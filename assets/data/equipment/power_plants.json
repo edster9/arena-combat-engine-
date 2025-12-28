@@ -22,7 +22,8 @@
     },
     "physics_translation": {
       "_notes": "Conversion from Car Wars values to physics engine values",
-      "motor_force": "power_factors * 2.5 (Newtons)",
+      "motor_force": "Optional override in Newtons. If not set, defaults to power_factors * 2.5",
+      "power_factors": "Car Wars reference value (read-only for display/rules)",
       "weight_to_mass": "lbs * 0.453592 (kg)",
       "top_speed_to_velocity": "mph * 0.44704 (m/s)"
     }
@@ -38,7 +39,8 @@
       "spaces": 3,
       "dp": 5,
       "power_factors": 800,
-      "power_units": 400
+      "power_units": 400,
+      "motor_force": 2800
     },
     "medium": {
       "id": "electric_medium",
@@ -49,7 +51,8 @@
       "spaces": 4,
       "dp": 8,
       "power_factors": 1400,
-      "power_units": 700
+      "power_units": 700,
+      "motor_force": 4900
     },
     "large": {
       "id": "electric_large",
@@ -60,7 +63,8 @@
       "spaces": 5,
       "dp": 10,
       "power_factors": 2000,
-      "power_units": 1000
+      "power_units": 1000,
+      "motor_force": 5000
     },
     "super": {
       "id": "electric_super",
@@ -71,7 +75,8 @@
       "spaces": 6,
       "dp": 12,
       "power_factors": 2600,
-      "power_units": 1300
+      "power_units": 1300,
+      "motor_force": 9100
     },
     "sport": {
       "id": "electric_sport",
@@ -82,7 +87,8 @@
       "spaces": 6,
       "dp": 12,
       "power_factors": 3000,
-      "power_units": 1500
+      "power_units": 1500,
+      "motor_force": 10500
     },
     "thundercat": {
       "id": "electric_thundercat",
@@ -93,7 +99,8 @@
       "spaces": 8,
       "dp": 15,
       "power_factors": 6700,
-      "power_units": 3350
+      "power_units": 3350,
+      "motor_force": 23450
     },
     "nuclear": {
       "id": "nuclear_standard",
@@ -106,6 +113,7 @@
       "power_factors": 20000,
       "max_top_speed": 200,
       "wheel_motor_upgrade_cost": 1000,
+      "motor_force": 70000,
       "notes": "Requires $1000 per wheel for motor upgrades. Special damage rules apply.",
       "components": ["reactor_core", "heat_exchangers", "generators", "cooling_system"]
     },
@@ -119,6 +127,7 @@
       "dp": 6,
       "power_factors": 50000,
       "max_top_speed": 130,
+      "motor_force": 175000,
       "notes": "Better shielding than standard nuclear. Special damage rules apply."
     }
   },
@@ -132,7 +141,8 @@
       "weight": 100,
       "spaces": 1,
       "dp": 2,
-      "power_factors": 400
+      "power_factors": 400,
+      "motor_force": 1400
     },
     "medium_cycle": {
       "id": "electric_cycle_medium",
@@ -142,7 +152,8 @@
       "weight": 150,
       "spaces": 1,
       "dp": 3,
-      "power_factors": 600
+      "power_factors": 600,
+      "motor_force": 2100
     },
     "large_cycle": {
       "id": "electric_cycle_large",
@@ -152,7 +163,8 @@
       "weight": 175,
       "spaces": 2,
       "dp": 4,
-      "power_factors": 800
+      "power_factors": 800,
+      "motor_force": 2800
     },
     "super_cycle": {
       "id": "electric_cycle_super",
@@ -162,7 +174,8 @@
       "weight": 200,
       "spaces": 2,
       "dp": 5,
-      "power_factors": 1000
+      "power_factors": 1000,
+      "motor_force": 3500
     },
     "super_trike": {
       "id": "electric_trike_super",
@@ -172,7 +185,8 @@
       "weight": 250,
       "spaces": 3,
       "dp": 6,
-      "power_factors": 1200
+      "power_factors": 1200,
+      "motor_force": 4200
     }
   },
 
@@ -186,7 +200,8 @@
       "spaces": 1,
       "dp": 1,
       "power_factors": 300,
-      "mpg": 80
+      "mpg": 80,
+      "motor_force": 1050
     },
     "30_cid": {
       "id": "gas_30cid",
@@ -197,7 +212,8 @@
       "spaces": 1,
       "dp": 2,
       "power_factors": 500,
-      "mpg": 70
+      "mpg": 70,
+      "motor_force": 1750
     },
     "50_cid": {
       "id": "gas_50cid",
@@ -208,7 +224,8 @@
       "spaces": 1,
       "dp": 3,
       "power_factors": 700,
-      "mpg": 60
+      "mpg": 60,
+      "motor_force": 2450
     },
     "100_cid": {
       "id": "gas_100cid",
@@ -219,7 +236,8 @@
       "spaces": 2,
       "dp": 6,
       "power_factors": 1300,
-      "mpg": 50
+      "mpg": 50,
+      "motor_force": 4550
     },
     "150_cid": {
       "id": "gas_150cid",
@@ -230,7 +248,8 @@
       "spaces": 3,
       "dp": 9,
       "power_factors": 1900,
-      "mpg": 45
+      "mpg": 45,
+      "motor_force": 6650
     },
     "200_cid": {
       "id": "gas_200cid",
@@ -241,7 +260,8 @@
       "spaces": 4,
       "dp": 12,
       "power_factors": 2500,
-      "mpg": 35
+      "mpg": 35,
+      "motor_force": 8750
     },
     "250_cid": {
       "id": "gas_250cid",
@@ -252,7 +272,8 @@
       "spaces": 5,
       "dp": 14,
       "power_factors": 3200,
-      "mpg": 28
+      "mpg": 28,
+      "motor_force": 11200
     },
     "300_cid": {
       "id": "gas_300cid",
@@ -263,7 +284,8 @@
       "spaces": 6,
       "dp": 16,
       "power_factors": 4000,
-      "mpg": 22
+      "mpg": 22,
+      "motor_force": 14000
     },
     "350_cid": {
       "id": "gas_350cid",
@@ -274,7 +296,8 @@
       "spaces": 7,
       "dp": 19,
       "power_factors": 5000,
-      "mpg": 18
+      "mpg": 18,
+      "motor_force": 17500
     },
     "400_cid": {
       "id": "gas_400cid",
@@ -285,7 +308,8 @@
       "spaces": 8,
       "dp": 22,
       "power_factors": 6300,
-      "mpg": 15
+      "mpg": 15,
+      "motor_force": 22050
     },
     "450_cid": {
       "id": "gas_450cid",
@@ -296,7 +320,8 @@
       "spaces": 9,
       "dp": 24,
       "power_factors": 7800,
-      "mpg": 13
+      "mpg": 13,
+      "motor_force": 27300
     },
     "500_cid": {
       "id": "gas_500cid",
@@ -307,7 +332,8 @@
       "spaces": 10,
       "dp": 26,
       "power_factors": 9500,
-      "mpg": 12
+      "mpg": 12,
+      "motor_force": 33250
     },
     "700_cid": {
       "id": "gas_700cid",
@@ -318,7 +344,8 @@
       "spaces": 14,
       "dp": 30,
       "power_factors": 13000,
-      "mpg": 10
+      "mpg": 10,
+      "motor_force": 45500
     }
   },
 

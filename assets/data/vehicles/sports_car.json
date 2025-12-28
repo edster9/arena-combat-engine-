@@ -1,10 +1,10 @@
 {
-  "name": "Sports Car",
-  "description": "Mid-sized dueling vehicle with balanced performance",
+  "name": "Gas Test Car",
+  "description": "Compact with 100 cid gas engine - target 10 mph/s (6s 0-60)",
   "class": "wheeled",
 
   "chassis": {
-    "body": "mid_sized",
+    "body": "compact",
     "modifier": "chassis_standard",
     "frame": "frame_standard"
   },
@@ -48,8 +48,9 @@
   ],
 
   "drivetrain": {
-    "axle_power": [
-      { "axle": "rear", "power_plant": "electric_large" }
-    ]
+    "type": "single_motor",
+    "gearbox": "gearbox_standard",
+    "power_plant": "gas_50cid",
+    "driven_axles": ["front", "rear"]
   }
 }
