@@ -1,6 +1,6 @@
 {
-  "name": "Gas Test Car",
-  "description": "Compact with 50 cid gas engine - target 5 mph/s (12s 0-60)",
+  "name": "10 mph/s Test Car",
+  "description": "Compact with 100 cid gas engine - target 10 mph/s (6s 0-60)",
   "class": "wheeled",
 
   "chassis": {
@@ -9,7 +9,7 @@
     "frame": "frame_standard"
   },
 
-  "power_plant": "gas_150cid",
+  "power_plant": "gas_100cid",
 
   "wheels": [
     { "id": "FL", "position": [1.4, -1, 1.3], "tire": "front_tires" },

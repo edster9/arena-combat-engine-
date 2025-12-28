@@ -225,10 +225,10 @@ static bool validate_vehicle_config(const VehicleJSON* v, const char* filepath) 
         valid = false;
     }
 
-    // Check drivetrain
-    if (v->drivetrain.motor_force <= 0.0f) {
-        fprintf(stderr, "ERROR [%s]: Missing or invalid motor force (%.0fN)\n",
-                filepath, v->drivetrain.motor_force);
+    // Check matchbox physics values
+    if (v->physics.accel_force <= 0.0f) {
+        fprintf(stderr, "ERROR [%s]: Missing or invalid acceleration force (%.0fN)\n",
+                filepath, v->physics.accel_force);
         valid = false;
     }
 
@@ -548,152 +548,32 @@ bool config_load_vehicle(const char* filepath, VehicleJSON* out) {
         }
     }
 
-    // Parse drivetrain - supports single_motor, dual_motor, and legacy formats
-    cJSON* drivetrain = cJSON_GetObjectItem(root, "drivetrain");
-    if (drivetrain) {
-        // Check for drivetrain type field
-        char dt_type_str[32] = "";
-        json_get_string(drivetrain, "type", dt_type_str, 32, "");
-
-        // Track combined power for Car Wars calculations
-        int total_power_factors = 0;
-        float total_motor_force = 0.0f;
-        float total_motor_weight_kg = 0.0f;
-        const char* power_plant_type = "electric";  // Default for top speed formula
-
-        if (strcmp(dt_type_str, "single_motor") == 0) {
-            // Single motor: power_plant + driven_axles
-            printf("  Drivetrain type: single_motor\n");
-
-            cJSON* pp_ref = cJSON_GetObjectItem(drivetrain, "power_plant");
-            if (pp_ref && cJSON_IsString(pp_ref)) {
-                const PowerPlantEquipment* pp = equipment_find_power_plant(pp_ref->valuestring);
-                if (pp) {
-                    total_motor_force = pp->motor_force;
-                    total_power_factors = pp->power_factors;
-                    total_motor_weight_kg = pp->weight_kg;
-                    power_plant_type = pp->type;
-                    printf("  Power Plant: %s (%.0fN, %d PF, %.0fkg)\n",
-                           pp->name, pp->motor_force, pp->power_factors, pp->weight_kg);
-                } else {
-                    fprintf(stderr, "Warning: Power plant '%s' not found\n", pp_ref->valuestring);
-                }
-            }
-
-            // Parse driven_axles array
-            cJSON* driven_axles = cJSON_GetObjectItem(drivetrain, "driven_axles");
-            if (driven_axles && cJSON_IsArray(driven_axles)) {
-                cJSON* axle_ref;
-                cJSON_ArrayForEach(axle_ref, driven_axles) {
-                    if (cJSON_IsString(axle_ref)) {
-                        for (int i = 0; i < out->axle_count; i++) {
-                            if (strcmp(out->axles[i].name, axle_ref->valuestring) == 0) {
-                                out->axles[i].driven = true;
-                            }
-                        }
-                    }
-                }
-            }
-
-        } else if (strcmp(dt_type_str, "dual_motor") == 0) {
-            // Dual motor: motors array with one motor per axle
-            printf("  Drivetrain type: dual_motor\n");
-
-            cJSON* motors = cJSON_GetObjectItem(drivetrain, "motors");
-            if (motors && cJSON_IsArray(motors)) {
-                cJSON* motor;
-                cJSON_ArrayForEach(motor, motors) {
-                    char axle_id[32] = "";
-                    json_get_string(motor, "axle", axle_id, 32, "");
-
-                    // Mark axle as driven
-                    for (int i = 0; i < out->axle_count; i++) {
-                        if (strcmp(out->axles[i].name, axle_id) == 0) {
-                            out->axles[i].driven = true;
-                        }
-                    }
-
-                    // Look up power plant and SUM values
-                    cJSON* pp_ref = cJSON_GetObjectItem(motor, "power_plant");
-                    if (pp_ref && cJSON_IsString(pp_ref)) {
-                        const PowerPlantEquipment* pp = equipment_find_power_plant(pp_ref->valuestring);
-                        if (pp) {
-                            total_motor_force += pp->motor_force;  // SUM motor forces
-                            total_power_factors += pp->power_factors;  // SUM power factors
-                            total_motor_weight_kg += pp->weight_kg;  // SUM weights
-                            power_plant_type = pp->type;  // Use last motor's type
-                            printf("    Motor [%s]: %s (%.0fN, %d PF, %.0fkg)\n",
-                                   axle_id, pp->name, pp->motor_force, pp->power_factors, pp->weight_kg);
-                        } else {
-                            fprintf(stderr, "Warning: Power plant '%s' not found\n", pp_ref->valuestring);
-                        }
-                    }
-                }
-                printf("  Combined: %.0fN total, %d PF, %.0fkg\n",
-                       total_motor_force, total_power_factors, total_motor_weight_kg);
-            }
-
-        } else {
-            // Legacy format or direct values
-            // Check for old axle_power format (backwards compatibility)
-            cJSON* axle_power = cJSON_GetObjectItem(drivetrain, "axle_power");
-            if (axle_power && cJSON_IsArray(axle_power)) {
-                printf("  Drivetrain: legacy axle_power format (consider updating to type: dual_motor)\n");
-                cJSON* ap;
-                cJSON_ArrayForEach(ap, axle_power) {
-                    char axle_id[32] = "";
-                    json_get_string(ap, "axle", axle_id, 32, "");
-
-                    for (int i = 0; i < out->axle_count; i++) {
-                        if (strcmp(out->axles[i].name, axle_id) == 0) {
-                            out->axles[i].driven = true;
-                        }
-                    }
-
-                    cJSON* pp_ref = cJSON_GetObjectItem(ap, "power_plant");
-                    if (pp_ref && cJSON_IsString(pp_ref)) {
-                        const PowerPlantEquipment* pp = equipment_find_power_plant(pp_ref->valuestring);
-                        if (pp) {
-                            // Legacy: SUM like dual_motor
-                            total_motor_force += pp->motor_force;
-                            total_power_factors += pp->power_factors;
-                            total_motor_weight_kg += pp->weight_kg;
-                            power_plant_type = pp->type;
-                        }
-                    }
-                }
-            } else {
-                // Direct values (oldest format)
-                out->drivetrain.type = parse_drivetrain_type(dt_type_str);
-                out->drivetrain.motor_force = json_get_float(drivetrain, "motor_force", out->drivetrain.motor_force);
-                out->drivetrain.brake_force = json_get_float(drivetrain, "brake_force", out->drivetrain.brake_force);
-                out->drivetrain.max_speed = json_get_float(drivetrain, "max_speed", out->drivetrain.max_speed);
-            }
-        }
-
-        // Apply combined motor values
-        if (total_motor_force > 0) {
-            out->drivetrain.motor_force = total_motor_force;
-            out->chassis_mass += total_motor_weight_kg;
+    // ========== MATCHBOX CAR PHYSICS - Power Plant ==========
+    // Read power_plant from top level, calculate acceleration/braking forces
+    cJSON* pp_ref = cJSON_GetObjectItem(root, "power_plant");
+    if (pp_ref && cJSON_IsString(pp_ref)) {
+        const PowerPlantEquipment* pp = equipment_find_power_plant(pp_ref->valuestring);
+        if (pp) {
+            // Add power plant weight to chassis mass
+            out->chassis_mass += pp->weight_kg;
             out->physics.chassis_mass = out->chassis_mass;
 
-            // Calculate top speed based on combined power factors
-            float est_weight = out->chassis_mass / LBS_TO_KG;
-            out->drivetrain.max_speed = equipment_calc_top_speed_ms(power_plant_type, total_power_factors, (int)est_weight);
-            printf("  Top Speed: %.1f m/s (%.0f mph)\n",
-                   out->drivetrain.max_speed, out->drivetrain.max_speed * 2.237f);
-
-            // Calculate Car Wars acceleration target from PF/weight ratio
-            // Store in physics config for acceleration test
-            out->physics.power_factors = total_power_factors;
+            // Store power factors for Car Wars calculations
+            out->physics.power_factors = pp->power_factors;
             strncpy(out->physics.vehicle_name, out->name, 63);
             out->physics.vehicle_name[63] = '\0';
 
-            float pf_weight_ratio = (float)total_power_factors / est_weight;
-            // Car Wars acceleration classes:
-            // 15 mph/s: ratio >= 1.0, target 0-60 = 4.0s
-            // 10 mph/s: ratio >= 0.5, target 0-60 = 6.0s
-            // 5 mph/s:  ratio >= 0.333, target 0-60 = 12.0s
+            // Calculate weight in lbs for Car Wars formulas
+            float weight_lbs = out->chassis_mass / LBS_TO_KG;
+            float pf_weight_ratio = (float)pp->power_factors / weight_lbs;
+
+            // Calculate top speed from Car Wars formula
+            out->physics.top_speed_ms = equipment_calc_top_speed_ms(pp->type, pp->power_factors, (int)weight_lbs);
+
+            // Determine acceleration class from PF/weight ratio
+            // 15 mph/s: ratio >= 1.0, 0-60 = 4.0s
+            // 10 mph/s: ratio >= 0.5, 0-60 = 6.0s
+            // 5 mph/s:  ratio >= 0.333, 0-60 = 12.0s
             if (pf_weight_ratio >= 1.0f) {
                 out->physics.target_0_60_seconds = 4.0f;
                 out->physics.target_accel_ms2 = 6.71f;  // 26.82 m/s / 4.0s
@@ -704,36 +584,62 @@ bool config_load_vehicle(const char* filepath, VehicleJSON* out) {
                 out->physics.target_0_60_seconds = 12.0f;
                 out->physics.target_accel_ms2 = 2.24f;  // 26.82 m/s / 12.0s
             } else {
-                // Below 5 mph/s class - use 5 mph/s as minimum
                 out->physics.target_0_60_seconds = 12.0f;
-                out->physics.target_accel_ms2 = 2.24f;
+                out->physics.target_accel_ms2 = 2.24f;  // Minimum 5 mph/s class
             }
-            printf("  Accel Target: %.1fs 0-60 (PF/wt=%.2f, class=%d mph/s)\n",
-                   out->physics.target_0_60_seconds, pf_weight_ratio,
-                   (int)(26.82f / out->physics.target_0_60_seconds * 2.237f));
-        }
 
-        // Determine drivetrain type label from which axles are driven
-        int front_driven = 0, rear_driven = 0;
-        for (int i = 0; i < out->axle_count; i++) {
-            if (out->axles[i].driven) {
-                if (strcmp(out->axles[i].name, "front") == 0) front_driven = 1;
-                if (strcmp(out->axles[i].name, "rear") == 0) rear_driven = 1;
+            // Calculate acceleration force: F = m * a * K
+            // K compensates for Jolt wheel rolling resistance (empirically tuned)
+            // Resistance is constant, not proportional to force, so K decreases for faster classes
+            // Per-bucket K values derived from empirical testing:
+            //   5 mph/s (12s): K=1.41 → 98% accuracy
+            //   10 mph/s (6s): K=1.20 → corrected from 118% overshoot
+            //   15 mph/s (4s): K=1.14 → corrected from 124% overshoot
+            //   20 mph/s (3s): K=1.10 → estimated (needs verification)
+            float k_compensation;
+            if (out->physics.target_0_60_seconds >= 12.0f) {
+                k_compensation = 1.41f;  // 5 mph/s class
+            } else if (out->physics.target_0_60_seconds >= 6.0f) {
+                k_compensation = 1.20f;  // 10 mph/s class
+            } else if (out->physics.target_0_60_seconds >= 4.0f) {
+                k_compensation = 1.14f;  // 15 mph/s class
+            } else {
+                k_compensation = 1.10f;  // 20 mph/s class
             }
+            out->physics.accel_force = out->physics.chassis_mass * out->physics.target_accel_ms2 * k_compensation;
+
+            printf("  Power Plant: %s (%d PF, %.0fkg)\n", pp->name, pp->power_factors, pp->weight_kg);
+            printf("  Total Weight: %.0f kg (%.0f lbs), PF/wt ratio: %.2f\n",
+                   out->chassis_mass, weight_lbs, pf_weight_ratio);
+            printf("  Accel Class: %d mph/s (%.1fs 0-60, F=%.0fN)\n",
+                   (int)(26.82f / out->physics.target_0_60_seconds * 2.237f),
+                   out->physics.target_0_60_seconds, out->physics.accel_force);
+            printf("  Top Speed: %.0f mph (%.1f m/s)\n",
+                   out->physics.top_speed_ms * 2.237f, out->physics.top_speed_ms);
+        } else {
+            fprintf(stderr, "Warning: Power plant '%s' not found\n", pp_ref->valuestring);
         }
-        if (front_driven && rear_driven) out->drivetrain.type = DRIVETRAIN_AWD;
-        else if (front_driven) out->drivetrain.type = DRIVETRAIN_FWD;
-        else out->drivetrain.type = DRIVETRAIN_RWD;
+    } else {
+        // No power plant - set defaults for testing
+        out->physics.target_0_60_seconds = 6.0f;
+        out->physics.target_accel_ms2 = 4.47f;
+        out->physics.accel_force = out->physics.chassis_mass * out->physics.target_accel_ms2;
+        out->physics.top_speed_ms = 40.0f;  // ~90 mph default
+        printf("  No power_plant defined - using defaults\n");
     }
 
-    // Calculate brake force from axle brake multipliers and chassis mass
+    // Calculate brake force from axle brake multipliers
     float total_brake_mult = 0.0f;
     for (int i = 0; i < out->axle_count; i++) {
         total_brake_mult += out->axles[i].brake_force_multiplier;
     }
     if (total_brake_mult > 0) {
-        out->drivetrain.brake_force = out->chassis_mass * (total_brake_mult / out->axle_count);
+        // Brake force = mass * deceleration (assume ~10 m/s² for hard braking)
+        out->physics.brake_force = out->physics.chassis_mass * 10.0f * (total_brake_mult / out->axle_count);
+    } else {
+        out->physics.brake_force = out->physics.chassis_mass * 8.0f;  // Default braking
     }
+    printf("  Brake Force: %.0fN\n", out->physics.brake_force);
 
     // Populate physics struct for Jolt
     out->physics.use_per_wheel_config = true;
@@ -747,9 +653,6 @@ bool config_load_vehicle(const char* filepath, VehicleJSON* out) {
     out->physics.suspension_frequency = out->defaults.suspension.frequency;
     out->physics.suspension_damping = out->defaults.suspension.damping;
     out->physics.suspension_travel = out->defaults.suspension.travel;
-    out->physics.max_motor_force = out->drivetrain.motor_force;
-    out->physics.max_brake_force = out->drivetrain.brake_force;
-    out->motor_max_speed = out->drivetrain.max_speed;
     out->physics.tire_friction = out->defaults.wheel.friction;
 
     // Initialize per-wheel arrays with defaults
@@ -759,7 +662,6 @@ bool config_load_vehicle(const char* filepath, VehicleJSON* out) {
         out->physics.wheel_widths[i] = out->defaults.wheel.width;
         out->physics.wheel_masses[i] = out->defaults.wheel.mass;
         out->physics.wheel_steering[i] = false;
-        out->physics.wheel_driven[i] = false;
         out->physics.wheel_steer_angles[i] = 0.6f;
         out->physics.wheel_suspension_frequency[i] = out->defaults.suspension.frequency;
         out->physics.wheel_suspension_damping[i] = out->defaults.suspension.damping;
@@ -787,7 +689,6 @@ bool config_load_vehicle(const char* filepath, VehicleJSON* out) {
             int idx = wheel_id_to_index(axle->wheel_ids[w]);
             if (idx >= 0 && idx < 4) {
                 out->physics.wheel_steering[idx] = axle->steering;
-                out->physics.wheel_driven[idx] = axle->driven;
                 if (axle->steering) {
                     out->physics.wheel_steer_angles[idx] = axle->max_steer_angle;
                 }
@@ -1153,16 +1054,7 @@ bool config_is_strict_mode(void) {
 void config_apply_physics_mode(VehicleJSON* vehicle, const PhysicsMode* mode) {
     if (!mode) return;
 
-    printf("  Applying physics mode: %s\n", mode->name);
-
-    // Drivetrain label is informational only (for UI/rules display)
-    // Actual wheel_driven[] is determined by axle_power in vehicle config
-    if (mode->overrides.override_drivetrain) {
-        vehicle->drivetrain.type = mode->overrides.drivetrain;
-        const char* dt_names[] = {"RWD", "FWD", "AWD", "4WD"};
-        printf("    -> Drivetrain label: %s (informational only - physics uses axle_power)\n",
-               dt_names[mode->overrides.drivetrain]);
-    }
+    printf("  Applying physics mode: %s (matchbox car physics - wheels unpowered)\n", mode->name);
 
     // Apply tire override
     if (mode->overrides.override_tire) {
@@ -1192,39 +1084,7 @@ void config_apply_physics_mode(VehicleJSON* vehicle, const PhysicsMode* mode) {
                mode->overrides.suspension.damping);
     }
 
-    // In strict Car Wars mode, use linear acceleration mode
-    // This bypasses the engine simulation entirely and applies direct force F = m * a
-    // Gives constant acceleration regardless of speed (per Car Wars rules - no air resistance)
-    if (mode->type == PHYSICS_MODE_STRICT_CAR_WARS && vehicle->physics.target_accel_ms2 > 0.0f) {
-        float mass_kg = vehicle->physics.chassis_mass;
-        float target_accel = vehicle->physics.target_accel_ms2;
-
-        // Enable linear acceleration mode
-        vehicle->physics.use_linear_accel = true;
-        vehicle->physics.linear_accel_force = mass_kg * target_accel;
-
-        // Top speed from Car Wars tables (max_speed is in m/s)
-        vehicle->physics.top_speed_ms = vehicle->drivetrain.max_speed;
-
-        printf("    -> Linear accel mode: F=%.0fN (mass=%.0fkg * accel=%.2f m/s²)\n",
-               vehicle->physics.linear_accel_force, mass_kg, target_accel);
-        printf("       Top speed limit: %.1f m/s (%.0f mph)\n",
-               vehicle->physics.top_speed_ms, vehicle->physics.top_speed_ms * 2.237f);
-    }
-
-    // Apply transmission override
-    if (mode->overrides.override_transmission) {
-        vehicle->physics.use_config_transmission = true;
-        vehicle->physics.gear_count = mode->overrides.transmission.gear_count;
-        for (int i = 0; i < mode->overrides.transmission.gear_count; i++) {
-            vehicle->physics.gear_ratios[i] = mode->overrides.transmission.gear_ratios[i];
-        }
-        vehicle->physics.reverse_count = mode->overrides.transmission.reverse_count;
-        for (int i = 0; i < mode->overrides.transmission.reverse_count; i++) {
-            vehicle->physics.reverse_ratios[i] = mode->overrides.transmission.reverse_ratios[i];
-        }
-        vehicle->physics.differential_ratio = mode->overrides.transmission.differential_ratio;
-        printf("    -> Transmission: %d gears, diff=%.2f\n",
-               vehicle->physics.gear_count, vehicle->physics.differential_ratio);
-    }
+    // Matchbox car physics is always on - accel_force is set during vehicle loading
+    printf("    -> Accel force: %.0fN (%.1fs 0-60)\n",
+           vehicle->physics.accel_force, vehicle->physics.target_0_60_seconds);
 }

@@ -18,9 +18,11 @@
 #define WHEEL_RL 2  // Rear Left
 #define WHEEL_RR 3  // Rear Right
 
-// Vehicle configuration
+// Vehicle configuration - "matchbox car" physics model
+// Wheels are unpowered - acceleration comes from direct body force
 typedef struct {
-    float chassis_mass;      // kg
+    // Chassis
+    float chassis_mass;      // kg (includes power plant weight)
     float chassis_length;    // meters (Z axis - forward)
     float chassis_width;     // meters (X axis - side to side)
     float chassis_height;    // meters (Y axis - up)
@@ -32,7 +34,6 @@ typedef struct {
     float wheel_widths[4];   // Width per wheel (meters)
     float wheel_masses[4];   // Mass per wheel (kg)
     bool wheel_steering[4];  // Which wheels can steer
-    bool wheel_driven[4];    // Which wheels are powered
     float wheel_steer_angles[4]; // Max steer angle per wheel (radians)
 
     // Per-wheel suspension (Jolt style: frequency/damping)
@@ -52,37 +53,17 @@ typedef struct {
 
     float max_steer_angle;   // Max steering angle in radians
 
-    // Engine/drivetrain
-    float engine_max_torque; // Nm
-    float engine_max_rpm;    // Max RPM
-
-    // Transmission/gearbox
-    #define MAX_CONFIG_GEARS 8
-    float gear_ratios[MAX_CONFIG_GEARS];
-    int gear_count;
-    float reverse_ratios[MAX_CONFIG_GEARS];
-    int reverse_count;
-    float differential_ratio;
-    bool use_config_transmission;  // If true, use these values instead of hardcoded
-
     // Tire properties
     float tire_friction;     // Friction coefficient (mu), higher = more grip
 
-    // Legacy values for compatibility
-    float max_motor_force;   // Will be converted to torque
-    float max_brake_force;   // Brake force (Newtons)
-
-    // Car Wars acceleration targets (for tuning/testing)
-    int power_factors;            // Total power factors from power plant(s)
+    // Car Wars physics - direct force application
+    int power_factors;            // Total power factors from power plant
     float target_accel_ms2;       // Target acceleration in m/s² (from PF/weight ratio)
     float target_0_60_seconds;    // Target 0-60 time in seconds
-    char vehicle_name[64];        // Vehicle name for test output
-
-    // Car Wars linear acceleration mode
-    // When enabled, bypasses engine simulation and applies constant F = m * a
-    bool use_linear_accel;        // Enable direct force application
-    float linear_accel_force;     // Force in Newtons (mass * target_accel)
+    float accel_force;            // Force in Newtons (mass * target_accel)
+    float brake_force;            // Brake force in Newtons
     float top_speed_ms;           // Top speed limit in m/s (from Car Wars tables)
+    char vehicle_name[64];        // Vehicle name for test output
 
     // Wheel mount points (legacy - used if wheel_positions all zero)
     float wheelbase;         // Distance between front and rear axles
@@ -134,6 +115,7 @@ typedef struct {
     float accel_test_print_timer; // Timer for periodic output
     Vec3 accel_test_start_pos;
     float accel_test_last_speed;
+    float accel_test_target_ms;  // Target speed in m/s (min of 60mph or top_speed)
 } PhysicsVehicle;
 
 // Physics world

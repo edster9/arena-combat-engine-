@@ -337,19 +337,13 @@ int main(int argc, char* argv[]) {
     camera.yaw = -1.57f;                // Look toward center (-90 degrees)
     camera.pitch = -0.4f;               // Look slightly down
 
-    // Initialize floor (200 units total, 1 unit grid = Car Wars scale)
+    // Floor will be initialized after scene config is loaded
     Floor arena_floor;
-    if (!floor_init(&arena_floor, 200.0f, 1.0f)) {
-        fprintf(stderr, "Failed to initialize floor\n");
-        platform_shutdown(&platform);
-        return 1;
-    }
 
     // Initialize box renderer for walls and obstacles
     BoxRenderer box_renderer;
     if (!box_renderer_init(&box_renderer)) {
         fprintf(stderr, "Failed to initialize box renderer\n");
-        floor_destroy(&arena_floor);
         platform_shutdown(&platform);
         return 1;
     }
@@ -416,6 +410,15 @@ int main(int argc, char* argv[]) {
 
     // Set up ground plane from scene config
     physics_set_ground(&physics, scene_config.arena.ground_y);
+
+    // Initialize floor with arena size from config (1 unit grid = Car Wars scale)
+    if (!floor_init(&arena_floor, scene_config.arena.size, 1.0f)) {
+        fprintf(stderr, "Failed to initialize floor\n");
+        physics_destroy(&physics);
+        box_renderer_destroy(&box_renderer);
+        platform_shutdown(&platform);
+        return 1;
+    }
 
     // Add arena walls to physics
     physics_add_arena_walls(&physics, scene_config.arena.size,

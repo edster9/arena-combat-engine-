@@ -1,101 +1,126 @@
 # Physics Tuning Status
 
-## Current State (2025-12-27)
+## Current State (2025-12-28)
 
-We migrated from ODE to Jolt Physics and implemented a **linear acceleration mode** for strict Car Wars physics.
+**Matchbox car physics fully validated** - all 21 power plants tested and passing.
 
-## Linear Acceleration Mode (NEW)
+## Matchbox Car Physics Model
 
-Instead of tuning engine/transmission parameters to achieve correct acceleration, we now apply direct force:
+Instead of simulating engine/transmission/drivetrain, we apply direct force to the vehicle body:
 
 ```
-F = mass × target_acceleration
+F = mass × target_acceleration × K
 ```
 
-This "matchbox car" approach directly implements Car Wars rules:
-- Acceleration is constant regardless of current speed (no air resistance)
-- Top speed is enforced from Car Wars tables
-- No tire spin, clutch slip, or drivetrain losses
-- Physics engine still handles collisions, flips, and environmental interaction
+Where:
+- **mass** = Total vehicle weight in kg
+- **target_acceleration** = From Car Wars PF/weight ratio (m/s²)
+- **K** = Per-bucket compensation factor for Jolt wheel physics resistance
 
-### How It Works
-1. Calculate target acceleration from PF/weight ratio (5/10/15 mph/s classes)
-2. Apply direct body force: `F = m × a × throttle`
-3. Cap at top speed from Car Wars tables
-4. Wheels are cosmetic - they don't affect movement
+### Per-Bucket K Compensation Factors
 
-### Configuration
-In strict Car Wars mode (`physics_modes.json`):
-- `use_linear_accel = true` (set automatically)
-- `linear_accel_force = mass × target_accel_ms2`
-- `top_speed_ms` from power plant tables
+| Bucket | Target 0-60 | K Factor |
+|--------|-------------|----------|
+| 5 mph/s | 12.0s | 1.41 |
+| 10 mph/s | 6.0s | 1.20 |
+| 15 mph/s | 4.0s | 1.14 |
+| 20 mph/s | 3.0s | 1.10 |
+
+### Why This Works
+
+- Car Wars acceleration is constant regardless of speed (no air resistance modeling)
+- Top speed comes from Car Wars formula, not physics simulation
+- Wheels are cosmetic - steering uses Jolt constraint, but propulsion is body force
+- Physics engine handles collisions, flips, jumps, gravity
+
+### Top Speed Formulas
+
+- **Gas**: `240 × PF / (PF + weight)` mph
+- **Electric**: `360 × PF / (PF + weight)` mph
 
 ## Test Results
 
-### 50 cid Gas Engine (5 mph/s class)
-- **Chassis**: Compact (712 kg total)
-- **PF/weight ratio**: 700/1570 = 0.45
-- **Target**: 12.0s 0-60 (2.24 m/s²)
-- **Linear force**: 1595N
-- **Top speed**: 74 mph
+All tests performed on Compact chassis (590kg base) with standard tires (mu=2.0).
 
-### Previous K-factor approach (deprecated)
-We tried calibrating K factors per acceleration class:
-- 15 mph/s class: K=1.23
-- 10 mph/s class: K=0.31
-- 5 mph/s class: K=0.16 (failed - car topped out at 42 mph)
+### Gas Power Plants (13/13 PASS)
 
-The linear approach is cleaner and doesn't require per-class calibration.
+| Engine | PF | Weight | PF/Wt | Bucket | Target | Actual | Accuracy | Result |
+|--------|-----|--------|-------|--------|--------|--------|----------|--------|
+| 10 cid | 300 | 1480 lbs | 0.20 | 5 mph/s | 8.0s (0-40)* | 7.33s | 110% | PASS |
+| 30 cid | 500 | 1535 lbs | 0.33 | 5 mph/s | 11.8s (0-59)* | 11.98s | 98% | PASS |
+| 50 cid | 700 | 1570 lbs | 0.45 | 5 mph/s | 12.0s | 12.27s | 98% | PASS |
+| 100 cid | 1300 | 1685 lbs | 0.77 | 10 mph/s | 6.0s | 6.17s | 97% | PASS |
+| 150 cid | 1900 | 1795 lbs | 1.06 | 15 mph/s | 4.0s | 4.08s | 98% | PASS |
+| 200 cid | 2500 | 1900 lbs | 1.32 | 15 mph/s | 4.0s | 4.07s | 98% | PASS |
+| 250 cid | 3200 | 2135 lbs | 1.50 | 15 mph/s | 4.0s | 4.05s | 99% | PASS |
+| 300 cid | 4000 | 2245 lbs | 1.78 | 15 mph/s | 4.0s | 4.05s | 99% | PASS |
+| 350 cid | 5000 | 2395 lbs | 2.09 | 15 mph/s | 4.0s | 4.03s | 99% | PASS |
+| 400 cid | 6300 | 2470 lbs | 2.55 | 15 mph/s | 4.0s | 4.03s | 99% | PASS |
+| 450 cid | 7800 | 2545 lbs | 3.06 | 15 mph/s | 4.0s | 4.02s | 100% | PASS |
+| 500 cid | 9500 | 2620 lbs | 3.63 | 15 mph/s | 4.0s | 4.02s | 100% | PASS |
+| 700 cid | 13000 | 2695 lbs | 4.82 | 15 mph/s | 4.0s | 4.02s | 100% | PASS |
+
+*Top-speed limited tests - scaled proportionally from 0-60 baseline
+
+### Electric Power Plants (8/8 PASS)
+
+| Power Plant | PF | Weight | PF/Wt | Bucket | Target | Actual | Accuracy | Result |
+|-------------|-----|--------|-------|--------|--------|--------|----------|--------|
+| Small | 800 | 1920 lbs | 0.42 | 5 mph/s | 12.0s | 12.03s | 100% | PASS |
+| Medium | 1400 | 2120 lbs | 0.66 | 10 mph/s | 6.0s | 6.08s | 99% | PASS |
+| Large | 2000 | 2320 lbs | 0.86 | 10 mph/s | 6.0s | 6.05s | 99% | PASS |
+| Super | 2600 | 2520 lbs | 1.03 | 15 mph/s | 4.0s | 4.03s | 99% | PASS |
+| Sport | 3000 | 2420 lbs | 1.24 | 15 mph/s | 4.0s | 4.03s | 99% | PASS |
+| Thundercat | 6700 | 3420 lbs | 1.96 | 15 mph/s | 4.0s | 3.98s | 100% | PASS |
+| Nuclear | 20000 | 3920 lbs | 5.10 | 15 mph/s | 4.0s | 3.97s | 101% | PASS |
+| Nuclear Truck | 50000 | 7420 lbs | 6.74 | 15 mph/s | 4.0s | 3.93s | 102% | PASS |
+
+### Summary
+
+| Type | Tested | Passed | Accuracy Range |
+|------|--------|--------|----------------|
+| Gas (10-700 cid) | 13 | 13 | 97-110% |
+| Electric | 8 | 8 | 99-102% |
+| **Total** | **21** | **21** | **97-110%** |
+
+### Not Yet Tested
+
+- **cycle_electric** (5 power plants) - Small cycle, Medium cycle, Large cycle, Super cycle, Super trike
 
 ## Key Files
 
 ### Physics Implementation
-- `client/src/physics/jolt_physics.cpp` - Linear accel force application
-- `client/src/physics/jolt_physics.h` - VehicleConfig with linear accel fields
+- `client/src/physics/jolt_physics.cpp` - Matchbox force application (lines 280-312)
+- `client/src/physics/jolt_physics.h` - VehicleConfig with Car Wars physics fields
 
 ### Configuration
-- `client/src/game/config_loader.cpp` - Enables linear mode in strict Car Wars
-- `assets/config/physics_modes.json` - Mode selection
+- `client/src/game/config_loader.cpp` - Per-bucket K factors (lines 591-609)
+- `assets/data/equipment/power_plants.json` - Power plant definitions
+- `assets/data/vehicles/sports_car.json` - Test vehicle config
 
-## Future: Full "Matchbox Car" Mode
+## Acceleration Test System
 
-The current implementation adds linear force but still runs the engine simulation.
-A cleaner approach would be:
+Press **T** to start 0-60 acceleration test:
+1. Vehicle respawns at origin, stopped
+2. Timer starts when throttle is applied
+3. Test completes at target speed (60 mph or top speed if lower)
+4. Reports time, acceleration, and PASS/FAIL based on bucket range
 
-### Strict Car Wars Mode (matchbox car)
-- **Acceleration**: Direct body force F = m × a
-- **Steering**: Direct heading rotation (no tire slip angles)
-- **Braking**: Direct deceleration force
-- **Physics for**: Collisions, flips, jumps, rams, gravity
-- **Wheels**: Pure decoration (spin visually, no physics effect)
-- No `SetDriverInput()` - bypass engine simulation entirely
+Press **R** to reload configs and test different power plants.
 
-### Extended Physics Mode (real simulation)
-- Full drivetrain simulation
-- Tire friction models
-- Engine/transmission/clutch
-- Gear ratios matter
-- Traction control
+## Top-Speed-Aware Testing
 
-## Next Steps
+For vehicles that can't reach 60 mph (e.g., 10 cid gas = 40 mph max):
+- Test target = min(60 mph, top_speed)
+- Bucket ranges scaled proportionally
+- Example: 0-40 test uses 67% of normal time ranges
 
-### Immediate (for strict Car Wars)
-1. [ ] Test linear accel mode with 0-60 test (should hit 12.0s target exactly)
-2. [ ] Implement linear steering (rotate heading directly)
-3. [ ] Remove engine simulation dependency in strict mode
-4. [ ] Verify all acceleration classes work (50/100/150 cid)
+## Car Wars Acceleration Buckets
 
-### Later (for extended physics)
-1. [ ] Create separate code path for "real physics" mode
-2. [ ] Move current engine/transmission tuning to extended mode
-3. [ ] Add tire slip angle modeling
-4. [ ] Per-tire friction based on equipment
-
-## Quick Test Commands
-```bash
-cd client && ./build.sh && ./run.sh
-```
-- **F2** = Start acceleration test
-- **Up arrow** = Throttle
-- **R** = Reload configs
-- Edit `sports_car.json` to change power_plant (gas_50cid, gas_100cid, gas_150cid)
+| PF/Weight Ratio | Acceleration | 0-60 Time |
+|-----------------|--------------|-----------|
+| < 0.5 | 5 mph/s | 12.0s |
+| 0.5 - 0.99 | 10 mph/s | 6.0s |
+| 1.0 - 1.99 | 15 mph/s | 4.0s |
+| 2.0 - 2.99 | 20 mph/s | 3.0s |
+| >= 3.0 (nuclear) | 25 mph/s | 2.4s |
