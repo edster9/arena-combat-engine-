@@ -121,6 +121,10 @@ void platform_toggle_fullscreen(Platform* p);
 #define KEY_DOWN        81
 #define KEY_UP          82
 
+// Bracket keys (for cruise control)
+#define KEY_LEFTBRACKET  47
+#define KEY_RIGHTBRACKET 48
+
 #define MOUSE_LEFT      0
 #define MOUSE_MIDDLE    1
 #define MOUSE_RIGHT     2

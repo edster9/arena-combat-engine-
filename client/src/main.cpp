@@ -142,11 +142,74 @@ static void draw_arena_walls(BoxRenderer* r, ArenaConfig* cfg) {
         wall_color);
 }
 
-// Draw obstacles from scene config
+// Draw obstacles from scene config (boxes only - ramps drawn separately)
 static void draw_obstacles(BoxRenderer* r, SceneJSON* scene) {
     for (int i = 0; i < scene->obstacle_count; i++) {
         SceneObstacle* o = &scene->obstacles[i];
+        if (strcmp(o->type, "ramp") == 0) continue;  // Ramps drawn as wireframes
         box_renderer_draw(r, o->position, o->size, o->color);
+    }
+}
+
+// Draw ramps as solid wedge shapes using triangles
+static void draw_ramps(BoxRenderer* r, SceneJSON* scene) {
+    for (int i = 0; i < scene->obstacle_count; i++) {
+        SceneObstacle* o = &scene->obstacles[i];
+        if (strcmp(o->type, "ramp") != 0) continue;
+
+        // Ramp: wedge shape with size.x=width, size.y=height (at high end), size.z=length
+        // Low end at -Z, high end at +Z (before rotation)
+        // Position is at center-bottom
+        float hw = o->size.x * 0.5f;  // half width
+        float h = o->size.y;          // full height
+        float hl = o->size.z * 0.5f;  // half length
+
+        // Apply Y rotation
+        float cos_r = cosf(o->rotation_y);
+        float sin_r = sinf(o->rotation_y);
+
+        // Transform local point to world
+        auto transform = [&](float lx, float ly, float lz) -> Vec3 {
+            return vec3(
+                o->position.x + lx * cos_r - lz * sin_r,
+                o->position.y + ly,
+                o->position.z + lx * sin_r + lz * cos_r
+            );
+        };
+
+        // Draw as series of boxes to approximate the ramp surface visually
+        // We'll draw thin boxes along the slope for a reasonable visual
+        const int SLICES = 8;
+        for (int s = 0; s < SLICES; s++) {
+            float t0 = (float)s / SLICES;
+            float t1 = (float)(s + 1) / SLICES;
+
+            // Height at each slice position
+            float h0 = h * t0;
+            float h1 = h * t1;
+
+            // Z position along the ramp
+            float z0 = -hl + (hl * 2.0f) * t0;
+            float z1 = -hl + (hl * 2.0f) * t1;
+
+            // Center of this slice segment
+            float slice_z = (z0 + z1) * 0.5f;
+            float slice_h = (h0 + h1) * 0.5f;
+            float slice_depth = (z1 - z0);
+
+            // Transform the slice center
+            Vec3 slice_pos = transform(0, slice_h * 0.5f, slice_z);
+
+            // Create rotation matrix for this slice (Y rotation only)
+            float rot_matrix[9] = {
+                cos_r,  0, sin_r,
+                0,      1, 0,
+                -sin_r, 0, cos_r
+            };
+
+            Vec3 slice_size = vec3(o->size.x, slice_h, slice_depth);
+            box_renderer_draw_rotated_matrix(r, slice_pos, slice_size, rot_matrix, o->color);
+        }
     }
 }
 
@@ -369,20 +432,11 @@ int main(int argc, char* argv[]) {
         fprintf(stderr, "Warning: Equipment data not loaded - using defaults\n");
     }
 
-    // Load physics mode configuration (strict vs extended)
-    PhysicsMode physics_mode;
-    config_load_physics_mode("../../assets/config/physics_modes.json", &physics_mode);
-
     // Load JSON configs - these are required for correct physics
     SceneJSON scene_config;
     VehicleJSON vehicle_config;
     bool scene_ok = config_load_scene("../../assets/config/scenes/showdown.json", &scene_config);
     bool vehicle_ok = config_load_vehicle("../../assets/data/vehicles/sports_car.json", &vehicle_config);
-
-    // Apply physics mode overrides to vehicle config
-    if (vehicle_ok) {
-        config_apply_physics_mode(&vehicle_config, &physics_mode);
-    }
 
     if (!scene_ok) {
         fprintf(stderr, "\n*** ERROR: Scene config failed to load! ***\n");
@@ -428,7 +482,11 @@ int main(int argc, char* argv[]) {
     // Add obstacles to physics from scene config
     for (int i = 0; i < scene_config.obstacle_count; i++) {
         SceneObstacle* o = &scene_config.obstacles[i];
-        physics_add_box_obstacle(&physics, o->position, o->size);
+        if (strcmp(o->type, "ramp") == 0) {
+            physics_add_ramp_obstacle(&physics, o->position, o->size, o->rotation_y);
+        } else {
+            physics_add_box_obstacle(&physics, o->position, o->size);
+        }
     }
 
     // Create physics vehicles for each entity using vehicle config
@@ -501,6 +559,11 @@ int main(int argc, char* argv[]) {
 
     // Game mode (F to toggle)
     GameMode game_mode = MODE_FREESTYLE;  // Start in freestyle for quick testing
+
+    // Steering state (accessible for status bar display)
+    bool discrete_steering = false;  // Start in gradual mode (easier to drive)
+    int steering_level = 0;         // -5 to +5 for discrete mode
+    float current_steering = 0.0f;  // Current steering value
 
     // Physics state for each car (indexed by entity id)
     CarPhysics car_physics[MAX_ENTITIES];
@@ -660,17 +723,12 @@ int main(int argc, char* argv[]) {
         // Reload vehicle config and recreate all vehicles with R
         if (input.keys_pressed[KEY_R]) {
             printf("Reloading configs...\n");
-            // Reload equipment first (in case equipment files changed)
+            // Reload equipment first (suspension.json, tires.json, etc.)
             equipment_load_all("../../assets/data/equipment");
 
-            // Reload physics mode
-            config_load_physics_mode("../../assets/config/physics_modes.json", &physics_mode);
-
-            // Try to reload vehicle config
+            // Try to reload vehicle config (will use reloaded equipment data)
             VehicleJSON new_vehicle_config;
             if (config_load_vehicle("../../assets/data/vehicles/sports_car.json", &new_vehicle_config)) {
-                // Apply physics mode overrides
-                config_apply_physics_mode(&new_vehicle_config, &physics_mode);
                 vehicle_config = new_vehicle_config;
                 VehicleConfig vehicle_cfg = config_vehicle_to_physics(&vehicle_config);
 
@@ -730,6 +788,36 @@ int main(int argc, char* argv[]) {
                 physics_vehicle_start_accel_test(&physics, entity_to_physics[sel->id]);
             } else {
                 printf("Select a vehicle first (T)\n");
+            }
+        }
+
+        // Cruise control: V = hold current speed
+        if (input.keys_pressed[KEY_V]) {
+            Entity* sel = entity_manager_get_selected(&entities);
+            if (sel && sel->id < MAX_ENTITIES && entity_to_physics[sel->id] >= 0) {
+                physics_vehicle_cruise_hold(&physics, entity_to_physics[sel->id]);
+            } else {
+                printf("Select a vehicle first (V)\n");
+            }
+        }
+
+        // Cruise control: ] = snap UP to next 10 mph
+        if (input.keys_pressed[KEY_RIGHTBRACKET]) {
+            Entity* sel = entity_manager_get_selected(&entities);
+            if (sel && sel->id < MAX_ENTITIES && entity_to_physics[sel->id] >= 0) {
+                physics_vehicle_cruise_snap_up(&physics, entity_to_physics[sel->id]);
+            } else {
+                printf("Select a vehicle first (])\n");
+            }
+        }
+
+        // Cruise control: [ = snap DOWN to previous 10 mph
+        if (input.keys_pressed[KEY_LEFTBRACKET]) {
+            Entity* sel = entity_manager_get_selected(&entities);
+            if (sel && sel->id < MAX_ENTITIES && entity_to_physics[sel->id] >= 0) {
+                physics_vehicle_cruise_snap_down(&physics, entity_to_physics[sel->id]);
+            } else {
+                printf("Select a vehicle first ([)\n");
             }
         }
 
@@ -835,19 +923,66 @@ int main(int argc, char* argv[]) {
                     float throttle = 0.0f;
                     float reverse = 0.0f;
                     float brake = 0.0f;
-                    float steer = 0.0f;
+
+                    // Steering modes: discrete (Car Wars style) or gradual (analog style)
+                    const float steering_rate = 2.5f;  // Full lock in ~0.4 seconds (gradual)
+
+                    // M key toggles steering mode
+                    if (input.keys_pressed[KEY_M]) {
+                        discrete_steering = !discrete_steering;
+                        // Reset steering when switching modes
+                        steering_level = 0;
+                        current_steering = 0.0f;
+                        printf("Steering mode: %s\n", discrete_steering ? "DISCRETE (tap arrows)" : "GRADUAL (hold arrows)");
+                    }
+
+                    if (discrete_steering) {
+                        // Discrete mode: Car Wars D ratings (D1=15°, D2=30°, D3=45°)
+                        // Level 0 = straight, ±1 = D1, ±2 = D2, ±3 = D3 (full lock)
+                        // Steering holds position until manually changed
+                        if (input.keys_pressed[KEY_LEFT]) {
+                            steering_level--;
+                            if (steering_level < -3) steering_level = -3;
+                        }
+                        if (input.keys_pressed[KEY_RIGHT]) {
+                            steering_level++;
+                            if (steering_level > 3) steering_level = 3;
+                        }
+                        // Both arrows = center immediately
+                        if (input.keys_pressed[KEY_LEFT] && input.keys_pressed[KEY_RIGHT]) {
+                            steering_level = 0;
+                        }
+                        // Map levels to steering: D1=0.333, D2=0.667, D3=1.0
+                        current_steering = steering_level * 0.333f;
+                    } else {
+                        // Gradual mode: hold arrows to steer, auto-center when released
+                        if (input.keys[KEY_LEFT]) {
+                            current_steering -= steering_rate * dt;
+                            if (current_steering < -1.0f) current_steering = -1.0f;
+                        } else if (input.keys[KEY_RIGHT]) {
+                            current_steering += steering_rate * dt;
+                            if (current_steering > 1.0f) current_steering = 1.0f;
+                        } else {
+                            // Auto-center when no arrows held
+                            if (current_steering > 0.0f) {
+                                current_steering -= steering_rate * dt;
+                                if (current_steering < 0.0f) current_steering = 0.0f;
+                            } else if (current_steering < 0.0f) {
+                                current_steering += steering_rate * dt;
+                                if (current_steering > 0.0f) current_steering = 0.0f;
+                            }
+                        }
+                    }
 
                     if (input.keys[KEY_UP]) throttle = 1.0f;
                     if (input.keys[KEY_DOWN]) reverse = 1.0f;
                     if (input.keys[KEY_SPACE]) brake = 1.0f;
-                    if (input.keys[KEY_LEFT]) steer = -1.0f;
-                    if (input.keys[KEY_RIGHT]) steer = 1.0f;
 
                     // Apply controls to physics vehicle
                     physics_vehicle_set_throttle(&physics, phys_id, throttle);
                     physics_vehicle_set_reverse(&physics, phys_id, reverse);
                     physics_vehicle_set_brake(&physics, phys_id, brake);
-                    physics_vehicle_set_steering(&physics, phys_id, steer);
+                    physics_vehicle_set_steering(&physics, phys_id, current_steering);
                 }
             }
         }
@@ -954,10 +1089,11 @@ int main(int argc, char* argv[]) {
         // Draw floor with procedural grid (modern OpenGL shader)
         floor_render(&arena_floor, &view, &projection, camera.position);
 
-        // Draw walls, obstacles, and cars with lighting
+        // Draw walls, obstacles, ramps, and cars with lighting
         box_renderer_begin(&box_renderer, &view, &projection, light_dir);
         draw_arena_walls(&box_renderer, &scene_config.arena);
         draw_obstacles(&box_renderer, &scene_config);
+        draw_ramps(&box_renderer, &scene_config);
         if (show_cars) {
             // Get selected physics vehicle id for highlighting
             Entity* sel = entity_manager_get_selected(&entities);
@@ -1160,18 +1296,73 @@ int main(int argc, char* argv[]) {
                                 sel->team == TEAM_BLUE ? "Blue" : "Other";
                 }
 
-                char status_text[128];
+                char status_text[160];
                 if (game_mode == MODE_FREESTYLE) {
-                    // Freestyle: show real-time velocity
+                    // Freestyle: show real-time velocity and cruise control status
                     float vel = 0.0f;
+                    int phys_id = -1;
                     if (sel && sel->id < MAX_ENTITIES) {
                         vel = car_physics[sel->id].velocity;
+                        phys_id = entity_to_physics[sel->id];
                     }
-                    // Convert to mph-ish (velocity * 2.25 gives nice numbers)
-                    int display_mph = (int)(fabsf(vel) * 2.25f);
-                    snprintf(status_text, sizeof(status_text),
-                        "[F] Mode: FREESTYLE  |  Vehicle: %s  |  Speed: %d mph  |  Arrow keys to drive",
-                        team_name, display_mph);
+                    // Convert to mph (velocity * 2.237 for m/s to mph)
+                    int display_mph = (int)(fabsf(vel) * 2.237f);
+
+                    // Get lateral velocity for drift detection (sideways speed)
+                    float lateral_ms = 0.0f;
+                    float force_n = 0.0f;
+                    float traction = 0.0f;
+                    if (phys_id >= 0) {
+                        physics_vehicle_get_lateral_velocity(&physics, phys_id, &lateral_ms);
+                        physics_vehicle_get_traction_info(&physics, phys_id, &force_n, &traction);
+                    }
+                    float lateral_mph = lateral_ms * 2.237f;
+
+                    // Drift indicator based on lateral velocity (sideways mph)
+                    // < 2 mph = normal, 2-5 mph = minor, 5-15 mph = DRIFT, > 15 mph = SPIN!
+                    char drift_str[16] = "";
+                    if (lateral_mph >= 15.0f) {
+                        snprintf(drift_str, sizeof(drift_str), " SPIN!");
+                    } else if (lateral_mph >= 5.0f) {
+                        snprintf(drift_str, sizeof(drift_str), " DRIFT");
+                    } else if (lateral_mph >= 2.0f) {
+                        snprintf(drift_str, sizeof(drift_str), " ~%.0f", lateral_mph);  // Show sideways mph
+                    }
+
+                    // Steering level display (Car Wars D ratings)
+                    char steer_str[8];
+                    if (discrete_steering) {
+                        if (steering_level == 0) {
+                            snprintf(steer_str, sizeof(steer_str), "0");
+                        } else {
+                            // Show as "L-D2" or "R-D1" etc (direction + difficulty)
+                            int d_level = steering_level < 0 ? -steering_level : steering_level;
+                            char dir = steering_level < 0 ? 'L' : 'R';
+                            snprintf(steer_str, sizeof(steer_str), "%c-D%d", dir, d_level);
+                        }
+                    } else {
+                        snprintf(steer_str, sizeof(steer_str), "~");  // Gradual mode indicator
+                    }
+
+                    // Traction display: always show force and wheels in contact (0-4)
+                    char traction_str[32] = "";
+                    int wheels_contact = (int)(traction * 4.0f + 0.5f);
+                    snprintf(traction_str, sizeof(traction_str), "  |  F:%.0fN (%d/4)",
+                             force_n, wheels_contact);
+
+                    // Check cruise control status
+                    bool cruise_on = phys_id >= 0 && physics_vehicle_cruise_active(&physics, phys_id);
+                    if (cruise_on) {
+                        float target_ms = physics_vehicle_cruise_target(&physics, phys_id);
+                        int target_mph = (int)(target_ms * 2.237f);
+                        snprintf(status_text, sizeof(status_text),
+                            "[F] %s  |  %d mph  |  CRUISE: %d  |  Steer: %s%s%s",
+                            team_name, display_mph, target_mph, steer_str, drift_str, traction_str);
+                    } else {
+                        snprintf(status_text, sizeof(status_text),
+                            "[F] %s  |  %d mph  |  Steer: %s%s%s",
+                            team_name, display_mph, steer_str, drift_str, traction_str);
+                    }
                 } else {
                     // Turn-based: show planning info
                     const char* speed_names[] = {"BRAKE", "HOLD", "ACCEL"};
@@ -1239,9 +1430,19 @@ int main(int argc, char* argv[]) {
 
                 text_draw(&text_renderer, "GAMEPLAY", tx, ty, UI_COLOR_CAUTION);
                 ty += line_h;
-                text_draw(&text_renderer, "  Arrows    Drive", tx, ty, UI_COLOR_WHITE);
+                text_draw(&text_renderer, "  Up/Down   Throttle/Reverse", tx, ty, UI_COLOR_WHITE);
                 ty += line_h;
-                text_draw(&text_renderer, "  R         Respawn", tx, ty, UI_COLOR_WHITE);
+                text_draw(&text_renderer, "  L/R       Steer (tap=D1-D3)", tx, ty, UI_COLOR_WHITE);
+                ty += line_h;
+                text_draw(&text_renderer, "  M         Steer mode toggle", tx, ty, UI_COLOR_WHITE);
+                ty += line_h;
+                text_draw(&text_renderer, "  V         Cruise hold", tx, ty, UI_COLOR_WHITE);
+                ty += line_h;
+                text_draw(&text_renderer, "  ]         Cruise +10mph", tx, ty, UI_COLOR_WHITE);
+                ty += line_h;
+                text_draw(&text_renderer, "  [         Cruise -10mph", tx, ty, UI_COLOR_WHITE);
+                ty += line_h;
+                text_draw(&text_renderer, "  Space     Brake", tx, ty, UI_COLOR_WHITE);
                 ty += line_h;
                 text_draw(&text_renderer, "  T         Accel Test", tx, ty, UI_COLOR_WHITE);
                 ty += line_h;

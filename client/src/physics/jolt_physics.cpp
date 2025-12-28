@@ -23,6 +23,7 @@
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
 #include <Jolt/Physics/Collision/Shape/CylinderShape.h>
+#include <Jolt/Physics/Collision/Shape/ConvexHullShape.h>
 #include <Jolt/Physics/Collision/Shape/OffsetCenterOfMassShape.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include <Jolt/Physics/Body/BodyActivationListener.h>
@@ -273,46 +274,124 @@ void physics_step(PhysicsWorld* pw, float dt)
             auto* vimpl = v->impl;
             BodyInterface& bodyInterface = impl->physicsSystem->GetBodyInterface();
 
-            // Calculate forward input from throttle/reverse
-            float forward = v->throttle - v->reverse;
+            // ========== ENGINE RPM MODEL ==========
+            // Engine "spins up" when throttle pressed, decays slowly when released
+            // This allows quick re-engagement at speed (engine already spun up)
+            const float rpmRampUp = 1.0f / 1.5f;   // Full RPM in 1.5 seconds
+            const float rpmDecay = 1.0f / 3.0f;    // Decay to zero in 3 seconds
+            float stepDt = pw->step_size;          // Use fixed physics timestep
+
+            // Engine RPM: ramps up when throttle pressed, decays slowly when released
+            if (v->throttle > 0.0f) {
+                // Accelerating: ramp RPM toward 1.0
+                v->engine_rpm = fminf(v->engine_rpm + rpmRampUp * stepDt, 1.0f);
+            } else {
+                // Coasting: decay RPM slowly (engine stays "warm")
+                v->engine_rpm = fmaxf(v->engine_rpm - rpmDecay * stepDt, 0.0f);
+            }
+
+            // Same for reverse
+            if (v->reverse > 0.0f) {
+                v->reverse_rpm = fminf(v->reverse_rpm + rpmRampUp * stepDt, 1.0f);
+            } else {
+                v->reverse_rpm = fmaxf(v->reverse_rpm - rpmDecay * stepDt, 0.0f);
+            }
+
+            // Calculate forward input: throttle * engine_rpm (instant power cut, but RPM persists)
+            // This means releasing throttle = instant zero force, but re-pressing is fast
+            float forward = (v->throttle * v->engine_rpm) - (v->reverse * v->reverse_rpm);
+
+            // ========== CRUISE CONTROL ==========
+            // Cancel cruise when brake is pressed
+            if (v->cruise_enabled && v->brake > 0.0f) {
+                v->cruise_enabled = false;
+                v->cruise_target_ms = 0;
+                printf("Cruise: OFF (brake pressed)\n");
+                fflush(stdout);
+            }
+
+            // Apply cruise control if enabled and no manual input
+            if (v->cruise_enabled && forward == 0.0f) {
+                JPH::Vec3 vel = bodyInterface.GetLinearVelocity(vimpl->bodyId);
+                float speed = vel.Length();
+                float target = v->cruise_target_ms;
+
+                // Proportional cruise control - always apply some force to maintain speed
+                float speedDiff = target - speed;
+                const float tolerance = 0.1f;  // m/s tolerance (~0.2 mph) - tight for accuracy
+
+                if (speedDiff > tolerance) {
+                    // Need to accelerate - proportional throttle with minimum
+                    forward = fminf(speedDiff / 3.0f + 0.1f, 1.0f);  // More aggressive + minimum
+                } else if (speedDiff < -tolerance) {
+                    // Need to slow down - coast (friction will handle it)
+                    forward = 0.0f;
+                } else {
+                    // Within tolerance - apply tiny maintenance force to overcome rolling resistance
+                    forward = 0.05f;
+                }
+            }
+            // ========== END CRUISE CONTROL ==========
+
+            // ========== WHEEL TRACTION CHECK ==========
+            // Count wheels in contact with ground - scale force by traction
+            // This prevents acceleration while airborne or flipped
+            WheeledVehicleController* controller = static_cast<WheeledVehicleController*>(
+                vimpl->constraint->GetController());
+            const Wheels& wheels = vimpl->constraint->GetWheels();
+
+            int wheelsInContact = 0;
+            for (size_t w = 0; w < wheels.size() && w < 4; w++)
+            {
+                if (wheels[w]->HasContact())
+                    wheelsInContact++;
+            }
+            float tractionFactor = (float)wheelsInContact / 4.0f;  // 0.0 to 1.0
+
+            // Store traction for status bar display
+            v->last_traction = tractionFactor;
+            v->last_applied_force = 0.0f;  // Reset, will accumulate below
 
             // ========== MATCHBOX CAR PHYSICS ==========
             // Apply direct body force for acceleration - wheels are unpowered
             // F = m * a gives constant acceleration regardless of speed
+            // Force is scaled by traction (wheels on ground)
             JPH::Vec3 vel = bodyInterface.GetLinearVelocity(vimpl->bodyId);
             float speed = vel.Length();
 
-            if (forward > 0.0f && speed < v->config.top_speed_ms)
+            if (forward > 0.0f && speed < v->config.top_speed_ms && tractionFactor > 0.0f)
             {
                 // Get vehicle's forward direction (Z axis in local space)
                 JPH::Quat rot = bodyInterface.GetRotation(vimpl->bodyId);
                 JPH::Vec3 forwardDir = rot.RotateAxisZ();
 
-                // Apply acceleration force proportional to throttle
-                float force = v->config.accel_force * forward;
+                // Apply acceleration force proportional to throttle AND traction
+                float force = v->config.accel_force * forward * tractionFactor;
                 bodyInterface.AddForce(vimpl->bodyId, forwardDir * force);
+                v->last_applied_force = force;  // Store for debug display
             }
-            else if (forward < 0.0f)
+            else if (forward < 0.0f && tractionFactor > 0.0f)
             {
-                // Reverse - apply force in opposite direction
+                // Reverse - apply force in opposite direction (scaled by traction)
                 JPH::Quat rot = bodyInterface.GetRotation(vimpl->bodyId);
                 JPH::Vec3 forwardDir = rot.RotateAxisZ();
-                float force = v->config.accel_force * (-forward);  // forward is negative
+                float force = v->config.accel_force * (-forward) * tractionFactor;
                 bodyInterface.AddForce(vimpl->bodyId, -forwardDir * force);
+                v->last_applied_force = -force;  // Negative for reverse
             }
 
-            // Apply braking as reverse force (or friction)
-            if (v->brake > 0.0f && speed > 0.1f)
+            // Apply braking as reverse force (also scaled by traction)
+            if (v->brake > 0.0f && speed > 0.1f && tractionFactor > 0.0f)
             {
                 // Brake force opposes current velocity direction
                 JPH::Vec3 velDir = vel.Normalized();
-                float brakeForce = v->config.brake_force * v->brake;
+                float brakeForce = v->config.brake_force * v->brake * tractionFactor;
                 bodyInterface.AddForce(vimpl->bodyId, -velDir * brakeForce);
+                // Don't add brake to last_applied_force - keep it throttle-only
             }
 
             // Steering - use the vehicle constraint for wheel angles
-            WheeledVehicleController* controller = static_cast<WheeledVehicleController*>(
-                vimpl->constraint->GetController());
+            // (controller already obtained above for traction check)
             // Only pass steering to controller, no throttle (wheels unpowered)
             controller->SetDriverInput(0.0f, v->steering, 0.0f, v->brake);
 
@@ -533,6 +612,53 @@ void physics_add_box_obstacle(PhysicsWorld* pw, ::Vec3 pos, ::Vec3 size)
     bodyInterface.AddBody(box->GetID(), EActivation::DontActivate);
 }
 
+void physics_add_ramp_obstacle(PhysicsWorld* pw, ::Vec3 pos, ::Vec3 size, float rotation_y)
+{
+    if (!pw || !pw->impl) return;
+
+    auto* impl = pw->impl;
+    BodyInterface& bodyInterface = impl->physicsSystem->GetBodyInterface();
+
+    // Create a wedge/ramp shape using convex hull
+    // size.x = width, size.y = height (at high end), size.z = length
+    // Low end at -Z, high end at +Z (before rotation)
+    // Position is at the center-bottom of the ramp
+    float hw = size.x * 0.5f;  // half width
+    float h = size.y;          // full height
+    float hl = size.z * 0.5f;  // half length
+
+    // 6 vertices of a triangular prism (wedge)
+    // Bottom face is rectangular, top face is a line at the high end
+    Array<JPH::Vec3> vertices;
+    vertices.reserve(6);
+    // Bottom face (4 corners at y=0)
+    vertices.push_back(JPH::Vec3(-hw, 0, -hl));  // Back-left bottom
+    vertices.push_back(JPH::Vec3( hw, 0, -hl));  // Back-right bottom
+    vertices.push_back(JPH::Vec3(-hw, 0,  hl));  // Front-left bottom
+    vertices.push_back(JPH::Vec3( hw, 0,  hl));  // Front-right bottom
+    // Top edge (2 corners at y=h, at front/high end)
+    vertices.push_back(JPH::Vec3(-hw, h,  hl));  // Front-left top
+    vertices.push_back(JPH::Vec3( hw, h,  hl));  // Front-right top
+
+    ConvexHullShapeSettings rampShapeSettings(vertices.data(), (int)vertices.size());
+    rampShapeSettings.SetEmbedded();
+    ShapeSettings::ShapeResult rampShapeResult = rampShapeSettings.Create();
+    if (!rampShapeResult.IsValid()) {
+        std::cerr << "[Jolt] Failed to create ramp shape: " << rampShapeResult.GetError() << std::endl;
+        return;
+    }
+    ShapeRefC rampShape = rampShapeResult.Get();
+
+    // Create rotation quaternion from Y angle
+    Quat rotation = Quat::sRotation(JPH::Vec3::sAxisY(), rotation_y);
+
+    BodyCreationSettings rampSettings(rampShape, RVec3(pos.x, pos.y, pos.z),
+        rotation, EMotionType::Static, Layers::NON_MOVING);
+
+    Body* ramp = bodyInterface.CreateBody(rampSettings);
+    bodyInterface.AddBody(ramp->GetID(), EActivation::DontActivate);
+}
+
 void physics_add_arena_walls(PhysicsWorld* pw, float arena_size, float wall_height, float wall_thickness)
 {
     float half = arena_size * 0.5f;
@@ -578,6 +704,8 @@ int physics_create_vehicle(PhysicsWorld* pw, ::Vec3 position, float rotation_y, 
     v->throttle = 0;
     v->reverse = 0;
     v->brake = 0;
+    v->engine_rpm = 0;
+    v->reverse_rpm = 0;
 
     // Initialize acceleration test state
     v->accel_test_active = false;
@@ -594,9 +722,16 @@ int physics_create_vehicle(PhysicsWorld* pw, ::Vec3 position, float rotation_y, 
     float halfWidth = config->chassis_width * 0.5f;
     float halfHeight = config->chassis_height * 0.5f;
 
-    // Create car body shape with lowered center of mass
+    // Create car body shape with center of mass from config
+    // CoM offset is normalized (-1 to 1 range per axis), multiply by half-dimensions
+    // Lower Y = more stable, less likely to flip during aggressive turns
+    JPH::Vec3 comOffset(
+        config->center_of_mass.x * halfWidth,
+        config->center_of_mass.y * halfHeight,
+        config->center_of_mass.z * halfLength
+    );
     RefConst<Shape> carShape = OffsetCenterOfMassShapeSettings(
-        JPH::Vec3(0, -halfHeight * 0.5f, 0),
+        comOffset,
         new BoxShape(JPH::Vec3(halfWidth, halfHeight, halfLength))
     ).Create().Get();
 
@@ -698,11 +833,14 @@ int physics_create_vehicle(PhysicsWorld* pw, ::Vec3 position, float rotation_y, 
         ws->mLongitudinalFriction.mPoints.push_back({0.2f, tireMu * 1.0f});   // Transition
         ws->mLongitudinalFriction.mPoints.push_back({1.0f, tireMu * 0.8f});   // Full wheelspin (80% of mu)
 
+        // RAILS MODE: High lateral friction - car grips through turns without flipping
+        // This is the "default" behavior; disasters will temporarily reduce this
+        const float railsMultiplier = 3.0f;  // 3x normal grip (5x caused rollovers)
         ws->mLateralFriction.mPoints.clear();
         ws->mLateralFriction.mPoints.push_back({0.0f, 0.0f});
-        ws->mLateralFriction.mPoints.push_back({3.0f, tireMu * 1.2f});   // Peak at 3 degrees
-        ws->mLateralFriction.mPoints.push_back({20.0f, tireMu * 1.0f});  // Sliding
-        ws->mLateralFriction.mPoints.push_back({90.0f, tireMu * 0.8f});  // Full sideways slide
+        ws->mLateralFriction.mPoints.push_back({3.0f, tireMu * railsMultiplier});   // Peak grip
+        ws->mLateralFriction.mPoints.push_back({20.0f, tireMu * railsMultiplier});  // Still gripping
+        ws->mLateralFriction.mPoints.push_back({90.0f, tireMu * railsMultiplier * 0.9f});  // Even sideways, high grip
 
         vehicleSettings.mWheels.push_back(ws);
     }
@@ -844,6 +982,8 @@ void physics_vehicle_respawn(PhysicsWorld* pw, int vehicle_id)
     v->throttle = 0;
     v->reverse = 0;
     v->brake = 0;
+    v->engine_rpm = 0;
+    v->reverse_rpm = 0;
 
     // Reset acceleration test for new run
     v->accel_test_active = false;
@@ -974,6 +1114,36 @@ void physics_vehicle_get_velocity(PhysicsWorld* pw, int vehicle_id, float* speed
     *speed_ms = vel.Length();
 }
 
+void physics_vehicle_get_lateral_velocity(PhysicsWorld* pw, int vehicle_id, float* lateral_ms)
+{
+    if (!pw || !pw->impl || !lateral_ms) return;
+    if (vehicle_id < 0 || vehicle_id >= MAX_PHYSICS_VEHICLES) return;
+
+    PhysicsVehicle* v = &pw->vehicles[vehicle_id];
+    if (!v->active || !v->impl) return;
+
+    auto* impl = pw->impl;
+    auto* vimpl = v->impl;
+    BodyInterface& bodyInterface = impl->physicsSystem->GetBodyInterface();
+
+    // Get velocity vector
+    JPH::Vec3 vel = bodyInterface.GetLinearVelocity(vimpl->bodyId);
+
+    // Get car's rotation quaternion
+    Quat q = bodyInterface.GetRotation(vimpl->bodyId);
+
+    // Get the car's right direction (local +X is right)
+    JPH::Vec3 localRight(1, 0, 0);
+    JPH::Vec3 worldRight = q * localRight;
+
+    // Lateral velocity = velocity dot right vector (horizontal components only)
+    // This gives how fast we're moving sideways relative to the car's facing
+    float lateral = vel.GetX() * worldRight.GetX() + vel.GetZ() * worldRight.GetZ();
+
+    // Return absolute lateral velocity in m/s
+    *lateral_ms = fabsf(lateral);
+}
+
 void physics_vehicle_get_wheel_states(PhysicsWorld* pw, int vehicle_id, WheelState* wheels)
 {
     if (!pw || !wheels) return;
@@ -1096,6 +1266,181 @@ void physics_debug_draw(PhysicsWorld* pw, struct LineRenderer* lr)
             }
         }
     }
+}
+
+// ========== CRUISE CONTROL ==========
+
+// Helper: convert m/s to mph
+static float ms_to_mph(float ms) {
+    return ms * 2.23694f;
+}
+
+// Helper: convert mph to m/s
+static float mph_to_ms(float mph) {
+    return mph / 2.23694f;
+}
+
+void physics_vehicle_cruise_hold(PhysicsWorld* pw, int vehicle_id)
+{
+    if (!pw || !pw->impl) return;
+    if (vehicle_id < 0 || vehicle_id >= MAX_PHYSICS_VEHICLES) return;
+
+    PhysicsVehicle* v = &pw->vehicles[vehicle_id];
+    if (!v->active || !v->impl) return;
+
+    auto* impl = pw->impl;
+    auto* vimpl = v->impl;
+    BodyInterface& bodyInterface = impl->physicsSystem->GetBodyInterface();
+
+    // Get current speed
+    JPH::Vec3 vel = bodyInterface.GetLinearVelocity(vimpl->bodyId);
+    float speed = vel.Length();
+
+    v->cruise_enabled = true;
+    v->cruise_target_ms = speed;
+
+    printf("Cruise: HOLD at %.0f mph (%.1f m/s)\n", ms_to_mph(speed), speed);
+    fflush(stdout);
+}
+
+void physics_vehicle_cruise_set(PhysicsWorld* pw, int vehicle_id, float target_ms)
+{
+    if (!pw || !pw->impl) return;
+    if (vehicle_id < 0 || vehicle_id >= MAX_PHYSICS_VEHICLES) return;
+
+    PhysicsVehicle* v = &pw->vehicles[vehicle_id];
+    if (!v->active || !v->impl) return;
+
+    // Clamp to top speed
+    float clamped = target_ms;
+    if (v->config.top_speed_ms > 0 && clamped > v->config.top_speed_ms) {
+        clamped = v->config.top_speed_ms;
+    }
+
+    v->cruise_enabled = true;
+    v->cruise_target_ms = clamped;
+
+    printf("Cruise: SET to %.0f mph (%.1f m/s)\n", ms_to_mph(clamped), clamped);
+    fflush(stdout);
+}
+
+void physics_vehicle_cruise_snap_up(PhysicsWorld* pw, int vehicle_id)
+{
+    if (!pw || !pw->impl) return;
+    if (vehicle_id < 0 || vehicle_id >= MAX_PHYSICS_VEHICLES) return;
+
+    PhysicsVehicle* v = &pw->vehicles[vehicle_id];
+    if (!v->active || !v->impl) return;
+
+    auto* impl = pw->impl;
+    auto* vimpl = v->impl;
+    BodyInterface& bodyInterface = impl->physicsSystem->GetBodyInterface();
+
+    // Use target speed if cruise already active, otherwise use current speed
+    float base_mph;
+    if (v->cruise_enabled && v->cruise_target_ms > 0) {
+        base_mph = ms_to_mph(v->cruise_target_ms);
+    } else {
+        JPH::Vec3 vel = bodyInterface.GetLinearVelocity(vimpl->bodyId);
+        base_mph = ms_to_mph(vel.Length());
+    }
+
+    // Snap UP to next 10 mph increment (33 -> 40, 40 -> 50)
+    float next_mph = ceilf((base_mph + 0.5f) / 10.0f) * 10.0f;
+
+    // Clamp to top speed
+    float top_mph = ms_to_mph(v->config.top_speed_ms);
+    if (next_mph > top_mph && top_mph > 0) {
+        next_mph = top_mph;
+    }
+
+    v->cruise_enabled = true;
+    v->cruise_target_ms = mph_to_ms(next_mph);
+
+    printf("Cruise: UP to %.0f mph (was %.0f mph)\n", next_mph, base_mph);
+    fflush(stdout);
+}
+
+void physics_vehicle_cruise_snap_down(PhysicsWorld* pw, int vehicle_id)
+{
+    if (!pw || !pw->impl) return;
+    if (vehicle_id < 0 || vehicle_id >= MAX_PHYSICS_VEHICLES) return;
+
+    PhysicsVehicle* v = &pw->vehicles[vehicle_id];
+    if (!v->active || !v->impl) return;
+
+    auto* impl = pw->impl;
+    auto* vimpl = v->impl;
+    BodyInterface& bodyInterface = impl->physicsSystem->GetBodyInterface();
+
+    // Use target speed if cruise already active, otherwise use current speed
+    float base_mph;
+    if (v->cruise_enabled && v->cruise_target_ms > 0) {
+        base_mph = ms_to_mph(v->cruise_target_ms);
+    } else {
+        JPH::Vec3 vel = bodyInterface.GetLinearVelocity(vimpl->bodyId);
+        base_mph = ms_to_mph(vel.Length());
+    }
+
+    // Snap DOWN to previous 10 mph increment (33 -> 30, 30 -> 20)
+    float prev_mph = floorf((base_mph - 0.5f) / 10.0f) * 10.0f;
+    if (prev_mph < 0) prev_mph = 0;
+
+    v->cruise_enabled = true;
+    v->cruise_target_ms = mph_to_ms(prev_mph);
+
+    printf("Cruise: DOWN to %.0f mph (was %.0f mph)\n", prev_mph, base_mph);
+    fflush(stdout);
+}
+
+void physics_vehicle_cruise_cancel(PhysicsWorld* pw, int vehicle_id)
+{
+    if (!pw || !pw->impl) return;
+    if (vehicle_id < 0 || vehicle_id >= MAX_PHYSICS_VEHICLES) return;
+
+    PhysicsVehicle* v = &pw->vehicles[vehicle_id];
+    if (!v->active) return;
+
+    if (v->cruise_enabled) {
+        v->cruise_enabled = false;
+        v->cruise_target_ms = 0;
+        printf("Cruise: OFF\n");
+        fflush(stdout);
+    }
+}
+
+bool physics_vehicle_cruise_active(PhysicsWorld* pw, int vehicle_id)
+{
+    if (!pw || !pw->impl) return false;
+    if (vehicle_id < 0 || vehicle_id >= MAX_PHYSICS_VEHICLES) return false;
+
+    PhysicsVehicle* v = &pw->vehicles[vehicle_id];
+    if (!v->active) return false;
+
+    return v->cruise_enabled;
+}
+
+float physics_vehicle_cruise_target(PhysicsWorld* pw, int vehicle_id)
+{
+    if (!pw || !pw->impl) return 0;
+    if (vehicle_id < 0 || vehicle_id >= MAX_PHYSICS_VEHICLES) return 0;
+
+    PhysicsVehicle* v = &pw->vehicles[vehicle_id];
+    if (!v->active) return 0;
+
+    return v->cruise_target_ms;
+}
+
+void physics_vehicle_get_traction_info(PhysicsWorld* pw, int vehicle_id, float* force_n, float* traction)
+{
+    if (!pw || !pw->impl) return;
+    if (vehicle_id < 0 || vehicle_id >= MAX_PHYSICS_VEHICLES) return;
+
+    PhysicsVehicle* v = &pw->vehicles[vehicle_id];
+    if (!v->active) return;
+
+    if (force_n) *force_n = v->last_applied_force;
+    if (traction) *traction = v->last_traction;
 }
 
 } // extern "C"

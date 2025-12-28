@@ -13,7 +13,8 @@
       "_notes": "3D physics dimensions in meters. Vehicle model can override within min/max bounds.",
       "length": "front-to-back",
       "width": "side-to-side (track)",
-      "height": "ground-to-roof"
+      "height": "ground-to-roof",
+      "center_of_mass": "CoM offset from chassis center [x, y, z]. Normalized: -1.0 = bottom, 0 = center. Default -0.9 = 90% down for stability."
     }
   },
 
@@ -38,7 +39,8 @@
       "physics": {
         "length": { "default": 3.8, "min": 3.2, "max": 4.2 },
         "width":  { "default": 1.6, "min": 1.4, "max": 1.8 },
-        "height": { "default": 1.3, "min": 1.1, "max": 1.5 }
+        "height": { "default": 1.3, "min": 1.1, "max": 1.5 },
+        "center_of_mass": [0, -0.9, 0]
       }
     },
     "compact": {
@@ -61,7 +63,8 @@
       "physics": {
         "length": { "default": 4.2, "min": 3.8, "max": 4.6 },
         "width":  { "default": 1.7, "min": 1.5, "max": 1.9 },
-        "height": { "default": 1.4, "min": 1.2, "max": 1.5 }
+        "height": { "default": 1.4, "min": 1.2, "max": 1.5 },
+        "center_of_mass": [0, -0.9, 0]
       }
     },
     "mid_sized": {
@@ -84,7 +87,8 @@
       "physics": {
         "length": { "default": 4.6, "min": 4.2, "max": 5.0 },
         "width":  { "default": 1.8, "min": 1.6, "max": 2.0 },
-        "height": { "default": 1.4, "min": 1.2, "max": 1.6 }
+        "height": { "default": 1.4, "min": 1.2, "max": 1.6 },
+        "center_of_mass": [0, -0.9, 0]
       }
     },
     "sedan": {
@@ -107,7 +111,8 @@
       "physics": {
         "length": { "default": 4.8, "min": 4.4, "max": 5.2 },
         "width":  { "default": 1.85, "min": 1.7, "max": 2.0 },
-        "height": { "default": 1.45, "min": 1.3, "max": 1.6 }
+        "height": { "default": 1.45, "min": 1.3, "max": 1.6 },
+        "center_of_mass": [0, -0.9, 0]
       }
     },
     "luxury": {
@@ -130,7 +135,8 @@
       "physics": {
         "length": { "default": 5.2, "min": 4.8, "max": 5.6 },
         "width":  { "default": 1.9, "min": 1.75, "max": 2.1 },
-        "height": { "default": 1.5, "min": 1.35, "max": 1.6 }
+        "height": { "default": 1.5, "min": 1.35, "max": 1.6 },
+        "center_of_mass": [0, -0.9, 0]
       }
     },
     "station_wagon": {
@@ -153,7 +159,8 @@
       "physics": {
         "length": { "default": 4.9, "min": 4.5, "max": 5.3 },
         "width":  { "default": 1.85, "min": 1.7, "max": 2.0 },
-        "height": { "default": 1.55, "min": 1.4, "max": 1.7 }
+        "height": { "default": 1.55, "min": 1.4, "max": 1.7 },
+        "center_of_mass": [0, -0.9, 0]
       }
     },
     "pickup": {
@@ -176,7 +183,8 @@
       "physics": {
         "length": { "default": 5.5, "min": 5.0, "max": 6.2 },
         "width":  { "default": 2.0, "min": 1.85, "max": 2.2 },
-        "height": { "default": 1.8, "min": 1.6, "max": 2.0 }
+        "height": { "default": 1.8, "min": 1.6, "max": 2.0 },
+        "center_of_mass": [0, -0.9, 0]
       },
       "notes": "HC -1 if over 5500 lbs"
     },
@@ -200,7 +208,8 @@
       "physics": {
         "length": { "default": 6.0, "min": 5.5, "max": 7.0 },
         "width":  { "default": 2.1, "min": 1.9, "max": 2.3 },
-        "height": { "default": 2.5, "min": 2.2, "max": 2.8 }
+        "height": { "default": 2.5, "min": 2.2, "max": 2.8 },
+        "center_of_mass": [0, -0.9, 0]
       }
     },
     "van": {
@@ -223,7 +232,8 @@
       "physics": {
         "length": { "default": 5.0, "min": 4.5, "max": 5.8 },
         "width":  { "default": 2.0, "min": 1.85, "max": 2.2 },
-        "height": { "default": 2.0, "min": 1.8, "max": 2.3 }
+        "height": { "default": 2.0, "min": 1.8, "max": 2.3 },
+        "center_of_mass": [0, -0.9, 0]
       }
     }
   },
@@ -249,7 +259,8 @@
       "physics": {
         "length": { "default": 1.8, "min": 1.5, "max": 2.0 },
         "width":  { "default": 0.6, "min": 0.5, "max": 0.7 },
-        "height": { "default": 1.0, "min": 0.9, "max": 1.1 }
+        "height": { "default": 1.0, "min": 0.9, "max": 1.1 },
+        "center_of_mass": [0, -0.9, 0]
       }
     },
     "medium_cycle": {
@@ -272,7 +283,8 @@
       "physics": {
         "length": { "default": 2.0, "min": 1.8, "max": 2.2 },
         "width":  { "default": 0.65, "min": 0.55, "max": 0.75 },
-        "height": { "default": 1.05, "min": 0.95, "max": 1.15 }
+        "height": { "default": 1.05, "min": 0.95, "max": 1.15 },
+        "center_of_mass": [0, -0.9, 0]
       }
     },
     "large_cycle": {
@@ -295,7 +307,8 @@
       "physics": {
         "length": { "default": 2.2, "min": 2.0, "max": 2.4 },
         "width":  { "default": 0.7, "min": 0.6, "max": 0.8 },
-        "height": { "default": 1.1, "min": 1.0, "max": 1.2 }
+        "height": { "default": 1.1, "min": 1.0, "max": 1.2 },
+        "center_of_mass": [0, -0.9, 0]
       }
     },
     "super_cycle": {
@@ -318,7 +331,8 @@
       "physics": {
         "length": { "default": 2.4, "min": 2.2, "max": 2.6 },
         "width":  { "default": 0.75, "min": 0.65, "max": 0.85 },
-        "height": { "default": 1.15, "min": 1.0, "max": 1.25 }
+        "height": { "default": 1.15, "min": 1.0, "max": 1.25 },
+        "center_of_mass": [0, -0.9, 0]
       }
     }
   },
@@ -344,7 +358,8 @@
       "physics": {
         "length": { "default": 2.6, "min": 2.3, "max": 2.9 },
         "width":  { "default": 1.4, "min": 1.2, "max": 1.6 },
-        "height": { "default": 1.1, "min": 1.0, "max": 1.3 }
+        "height": { "default": 1.1, "min": 1.0, "max": 1.3 },
+        "center_of_mass": [0, -0.9, 0]
       }
     },
     "medium_trike": {
@@ -367,7 +382,8 @@
       "physics": {
         "length": { "default": 2.8, "min": 2.5, "max": 3.1 },
         "width":  { "default": 1.5, "min": 1.3, "max": 1.7 },
-        "height": { "default": 1.15, "min": 1.0, "max": 1.3 }
+        "height": { "default": 1.15, "min": 1.0, "max": 1.3 },
+        "center_of_mass": [0, -0.9, 0]
       }
     },
     "heavy_trike": {
@@ -390,7 +406,8 @@
       "physics": {
         "length": { "default": 3.0, "min": 2.7, "max": 3.3 },
         "width":  { "default": 1.6, "min": 1.4, "max": 1.8 },
-        "height": { "default": 1.2, "min": 1.05, "max": 1.35 }
+        "height": { "default": 1.2, "min": 1.05, "max": 1.35 },
+        "center_of_mass": [0, -0.9, 0]
       }
     },
     "xheavy_trike": {
@@ -413,7 +430,8 @@
       "physics": {
         "length": { "default": 3.2, "min": 2.9, "max": 3.5 },
         "width":  { "default": 1.7, "min": 1.5, "max": 1.9 },
-        "height": { "default": 1.25, "min": 1.1, "max": 1.4 }
+        "height": { "default": 1.25, "min": 1.1, "max": 1.4 },
+        "center_of_mass": [0, -0.9, 0]
       }
     }
   },

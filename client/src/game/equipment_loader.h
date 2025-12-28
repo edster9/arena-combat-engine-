@@ -35,6 +35,8 @@ typedef struct {
     float height_default;
     float height_min;
     float height_max;
+    // Center of mass offset [x, y, z] from chassis center
+    float center_of_mass[3];
 } ChassisEquipment;
 
 // Power plant equipment

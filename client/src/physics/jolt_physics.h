@@ -26,6 +26,7 @@ typedef struct {
     float chassis_length;    // meters (Z axis - forward)
     float chassis_width;     // meters (X axis - side to side)
     float chassis_height;    // meters (Y axis - up)
+    Vec3 center_of_mass;     // Offset from chassis center [x, y, z]
 
     // Per-wheel configuration
     // Order: FL=0, FR=1, RL=2, RR=3
@@ -100,6 +101,8 @@ typedef struct {
     float throttle;          // Current throttle (0 to 1)
     float reverse;           // Current reverse (0 to 1)
     float brake;             // Current brake (0 to 1)
+    float engine_rpm;        // Engine spin-up state (0-1): ramps up 1.5s, decays 3s
+    float reverse_rpm;       // Reverse engine state (0-1): same behavior
 
     // Spawn state (for respawn)
     Vec3 spawn_position;
@@ -116,6 +119,14 @@ typedef struct {
     Vec3 accel_test_start_pos;
     float accel_test_last_speed;
     float accel_test_target_ms;  // Target speed in m/s (min of 60mph or top_speed)
+
+    // Cruise control state
+    bool cruise_enabled;         // Is cruise control active?
+    float cruise_target_ms;      // Target speed in m/s
+
+    // Debug: last applied force (for status bar display)
+    float last_applied_force;    // Force in Newtons applied this frame
+    float last_traction;         // Traction factor (0-1, wheels on ground)
 } PhysicsVehicle;
 
 // Physics world
@@ -141,6 +152,7 @@ void physics_step(PhysicsWorld* pw, float dt);
 // Ground/arena setup
 void physics_set_ground(PhysicsWorld* pw, float y_level);
 void physics_add_box_obstacle(PhysicsWorld* pw, Vec3 pos, Vec3 size);
+void physics_add_ramp_obstacle(PhysicsWorld* pw, Vec3 pos, Vec3 size, float rotation_y);  // size: x=width, y=height, z=length
 void physics_add_arena_walls(PhysicsWorld* pw, float arena_size, float wall_height, float wall_thickness);
 
 // Vehicle management
@@ -155,12 +167,23 @@ void physics_vehicle_set_brake(PhysicsWorld* pw, int vehicle_id, float brake);  
 void physics_vehicle_respawn(PhysicsWorld* pw, int vehicle_id);  // Reset to spawn position
 void physics_vehicle_start_accel_test(PhysicsWorld* pw, int vehicle_id);  // Start 0-60 acceleration test
 
+// Cruise control
+void physics_vehicle_cruise_hold(PhysicsWorld* pw, int vehicle_id);       // Lock current speed
+void physics_vehicle_cruise_set(PhysicsWorld* pw, int vehicle_id, float target_ms);  // Set specific target (m/s)
+void physics_vehicle_cruise_snap_up(PhysicsWorld* pw, int vehicle_id);    // Snap to next 10 mph increment
+void physics_vehicle_cruise_snap_down(PhysicsWorld* pw, int vehicle_id);  // Snap to previous 10 mph increment
+void physics_vehicle_cruise_cancel(PhysicsWorld* pw, int vehicle_id);     // Disable cruise control
+bool physics_vehicle_cruise_active(PhysicsWorld* pw, int vehicle_id);     // Check if cruise is enabled
+float physics_vehicle_cruise_target(PhysicsWorld* pw, int vehicle_id);    // Get target speed (m/s)
+
 // Get vehicle state (for rendering)
 void physics_vehicle_get_position(PhysicsWorld* pw, int vehicle_id, Vec3* pos);
 void physics_vehicle_get_rotation(PhysicsWorld* pw, int vehicle_id, float* rotation_y);
 void physics_vehicle_get_rotation_matrix(PhysicsWorld* pw, int vehicle_id, float* rot_matrix);
 void physics_vehicle_get_velocity(PhysicsWorld* pw, int vehicle_id, float* speed_ms);
+void physics_vehicle_get_lateral_velocity(PhysicsWorld* pw, int vehicle_id, float* lateral_ms);  // Drift detection (sideways speed)
 void physics_vehicle_get_wheel_states(PhysicsWorld* pw, int vehicle_id, WheelState* wheels);
+void physics_vehicle_get_traction_info(PhysicsWorld* pw, int vehicle_id, float* force_n, float* traction);  // Debug: force & traction
 
 // Debug visualization - call between line_renderer_begin/end
 struct LineRenderer;  // Forward declare

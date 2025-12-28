@@ -138,10 +138,11 @@ typedef struct {
 
 // Obstacle in scene
 typedef struct {
-    char type[MAX_NAME_LENGTH];  // "box" for now
+    char type[MAX_NAME_LENGTH];  // "box" or "ramp"
     Vec3 position;
-    Vec3 size;
+    Vec3 size;                   // For ramp: x=width, y=height, z=length
     Vec3 color;
+    float rotation_y;            // Rotation around Y axis (radians)
 } SceneObstacle;
 
 // Contact physics parameters (simplified for Jolt)

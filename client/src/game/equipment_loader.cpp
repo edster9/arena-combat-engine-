@@ -98,6 +98,19 @@ static bool load_chassis(const char* filepath) {
                     c->height_min = json_get_float(height, "min", 1.2f);
                     c->height_max = json_get_float(height, "max", 1.8f);
                 }
+
+                // Center of mass offset [x, y, z]
+                cJSON* com = cJSON_GetObjectItem(physics, "center_of_mass");
+                if (com && cJSON_IsArray(com) && cJSON_GetArraySize(com) >= 3) {
+                    c->center_of_mass[0] = (float)cJSON_GetArrayItem(com, 0)->valuedouble;
+                    c->center_of_mass[1] = (float)cJSON_GetArrayItem(com, 1)->valuedouble;
+                    c->center_of_mass[2] = (float)cJSON_GetArrayItem(com, 2)->valuedouble;
+                } else {
+                    // Default: centered, halfway down
+                    c->center_of_mass[0] = 0.0f;
+                    c->center_of_mass[1] = -0.5f;
+                    c->center_of_mass[2] = 0.0f;
+                }
             }
             g_equipment.chassis_count++;
         }

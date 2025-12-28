@@ -6,16 +6,19 @@
   "chassis": {
     "body": "compact",
     "modifier": "chassis_standard",
-    "frame": "frame_standard"
+    "frame": "frame_standard",
+    "length": 4.5,
+    "width": 1.7,
+    "height": 1.0
   },
 
-  "power_plant": "gas_150cid",
+  "power_plant": "gas_200cid",
 
   "wheels": [
-    { "id": "FL", "position": [1.4, -1, 1.3], "tire": "front_tires" },
-    { "id": "FR", "position": [1.4, -1, -1.3], "tire": "front_tires" },
-    { "id": "RL", "position": [-1.3, -1, 1.3], "tire": "rear_tires" },
-    { "id": "RR", "position": [-1.3, -1, -1.3], "tire": "rear_tires" }
+    { "id": "FL", "position": [1.2, -0.5, 0.75], "tire": "front_tires" },
+    { "id": "FR", "position": [1.2, -0.5, -0.75], "tire": "front_tires" },
+    { "id": "RL", "position": [-1.2, -0.5, 0.75], "tire": "rear_tires" },
+    { "id": "RR", "position": [-1.2, -0.5, -0.75], "tire": "rear_tires" }
   ],
 
   "tires": [

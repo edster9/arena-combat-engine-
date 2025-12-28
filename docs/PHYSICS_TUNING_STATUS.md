@@ -15,16 +15,29 @@ F = mass × target_acceleration × K
 Where:
 - **mass** = Total vehicle weight in kg
 - **target_acceleration** = From Car Wars PF/weight ratio (m/s²)
-- **K** = Per-bucket compensation factor for Jolt wheel physics resistance
+- **K** = Per-bucket compensation factor for Jolt wheel resistance + engine RPM ramp
+
+### Engine RPM Ramp-Up
+
+Throttle response simulates engine spin-up for more realistic feel:
+- **Ramp up**: 1.5 seconds from idle to full RPM
+- **Decay**: 3 seconds from full to idle when coasting
+- **Re-engagement**: Fast response if engine still "warm" (RPM > 0)
+
+This means tapping the throttle gives a short burst, while holding gives full power after 1.5s. Quick re-press at speed is near-instant (engine still spun up).
 
 ### Per-Bucket K Compensation Factors
 
+K values compensate for:
+1. Jolt wheel rolling resistance (constant, not speed-proportional)
+2. Engine RPM ramp-up (loses ~0.75s effective acceleration time)
+
 | Bucket | Target 0-60 | K Factor |
 |--------|-------------|----------|
-| 5 mph/s | 12.0s | 1.41 |
-| 10 mph/s | 6.0s | 1.20 |
-| 15 mph/s | 4.0s | 1.14 |
-| 20 mph/s | 3.0s | 1.10 |
+| 5 mph/s | 12.0s | 1.75 |
+| 10 mph/s | 6.0s | 1.59 |
+| 15 mph/s | 4.0s | 1.62 |
+| 20 mph/s | 3.0s | 1.55 |
 
 ### Why This Works
 

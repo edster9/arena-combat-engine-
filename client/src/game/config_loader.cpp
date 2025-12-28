@@ -449,14 +449,38 @@ bool config_load_vehicle(const char* filepath, VehicleJSON* out) {
             // New format: look up chassis by ID
             const ChassisEquipment* chassis_equip = equipment_find_chassis(body_ref->valuestring);
             if (chassis_equip) {
+                // Start with defaults from chassis equipment
                 out->chassis_length = chassis_equip->length_default;
                 out->chassis_width = chassis_equip->width_default;
                 out->chassis_height = chassis_equip->height_default;
                 // Calculate mass from weight (Car Wars lbs -> kg)
                 out->chassis_mass = chassis_equip->weight_lbs * LBS_TO_KG;
-                printf("  Chassis: %s (%.1fm x %.1fm x %.1fm, %.0fkg)\n",
+                // Copy center of mass from chassis equipment
+                out->physics.center_of_mass = vec3(
+                    chassis_equip->center_of_mass[0],
+                    chassis_equip->center_of_mass[1],
+                    chassis_equip->center_of_mass[2]
+                );
+
+                // Check for dimension overrides in vehicle JSON
+                cJSON* len_override = cJSON_GetObjectItem(chassis, "length");
+                cJSON* wid_override = cJSON_GetObjectItem(chassis, "width");
+                cJSON* hgt_override = cJSON_GetObjectItem(chassis, "height");
+                if (len_override && cJSON_IsNumber(len_override)) {
+                    out->chassis_length = (float)len_override->valuedouble;
+                }
+                if (wid_override && cJSON_IsNumber(wid_override)) {
+                    out->chassis_width = (float)wid_override->valuedouble;
+                }
+                if (hgt_override && cJSON_IsNumber(hgt_override)) {
+                    out->chassis_height = (float)hgt_override->valuedouble;
+                }
+
+                printf("  Chassis: %s (%.1fm x %.1fm x %.1fm, %.0fkg, CoM=[%.2f,%.2f,%.2f])\n",
                        chassis_equip->name, out->chassis_length, out->chassis_width,
-                       out->chassis_height, out->chassis_mass);
+                       out->chassis_height, out->chassis_mass,
+                       out->physics.center_of_mass.x, out->physics.center_of_mass.y,
+                       out->physics.center_of_mass.z);
             } else {
                 fprintf(stderr, "Warning: Chassis '%s' not found, using defaults\n", body_ref->valuestring);
             }
@@ -589,22 +613,23 @@ bool config_load_vehicle(const char* filepath, VehicleJSON* out) {
             }
 
             // Calculate acceleration force: F = m * a * K
-            // K compensates for Jolt wheel rolling resistance (empirically tuned)
-            // Resistance is constant, not proportional to force, so K decreases for faster classes
-            // Per-bucket K values derived from empirical testing:
-            //   5 mph/s (12s): K=1.41 → 98% accuracy
-            //   10 mph/s (6s): K=1.20 → corrected from 118% overshoot
-            //   15 mph/s (4s): K=1.14 → corrected from 124% overshoot
-            //   20 mph/s (3s): K=1.10 → estimated (needs verification)
+            // K compensates for:
+            //   1. Jolt wheel rolling resistance (constant, not proportional to force)
+            //   2. Engine RPM ramp-up (1.5s to full throttle, loses ~0.75s effective time)
+            // Per-bucket K values derived from empirical testing + ramp compensation:
+            //   5 mph/s (12s): K=1.75
+            //   10 mph/s (6s): K=1.59
+            //   15 mph/s (4s): K=1.62
+            //   20 mph/s (3s): K=1.55 (estimated)
             float k_compensation;
             if (out->physics.target_0_60_seconds >= 12.0f) {
-                k_compensation = 1.41f;  // 5 mph/s class
+                k_compensation = 1.75f;  // 5 mph/s class
             } else if (out->physics.target_0_60_seconds >= 6.0f) {
-                k_compensation = 1.20f;  // 10 mph/s class
+                k_compensation = 1.59f;  // 10 mph/s class
             } else if (out->physics.target_0_60_seconds >= 4.0f) {
-                k_compensation = 1.14f;  // 15 mph/s class
+                k_compensation = 1.62f;  // 15 mph/s class
             } else {
-                k_compensation = 1.10f;  // 20 mph/s class
+                k_compensation = 1.55f;  // 20 mph/s class
             }
             out->physics.accel_force = out->physics.chassis_mass * out->physics.target_accel_ms2 * k_compensation;
 
@@ -856,6 +881,7 @@ bool config_load_scene(const char* filepath, SceneJSON* out) {
             so->position = json_get_vec3(o, "position", vec3(0, 0, 0));
             so->size = json_get_vec3(o, "size", vec3(1, 1, 1));
             so->color = json_get_vec3(o, "color", vec3(0.5f, 0.5f, 0.5f));
+            so->rotation_y = json_get_float(o, "rotation", 0.0f);
             out->obstacle_count++;
         }
     }
@@ -880,7 +906,7 @@ static PhysicsMode s_active_physics_mode = {
         .tire = { .mu = 2.0f, .reference_radius = 0.35f, .reference_width = 0.2f },
         .override_tire = true,
         .suspension = { .frequency = 3.0f, .damping = 0.8f, .travel = 0.15f },
-        .override_suspension = true
+        .override_suspension = false  // Use suspension.json values (hot-reload with R)
     }
 };
 
@@ -898,7 +924,7 @@ bool config_load_physics_mode(const char* filepath, PhysicsMode* out) {
     out->overrides.suspension.frequency = 3.0f;
     out->overrides.suspension.damping = 0.8f;
     out->overrides.suspension.travel = 0.15f;
-    out->overrides.override_suspension = true;
+    out->overrides.override_suspension = false;  // Use suspension.json values (hot-reload with R)
 
     char* json_str = read_file(filepath);
     if (!json_str) {
