@@ -9,6 +9,7 @@
 #include <stdbool.h>
 #include "../math/vec3.h"
 #include "../game/handling.h"
+#include "../game/maneuver.h"
 
 // Maximum vehicles in physics world
 #define MAX_PHYSICS_VEHICLES 8
@@ -134,6 +135,9 @@ typedef struct {
 
     // Car Wars handling state (runtime)
     VehicleHandling handling;    // HC/HS tracking and control rolls
+
+    // Maneuver autopilot (for executing Car Wars maneuvers via physics)
+    ManeuverAutopilot autopilot;
 } PhysicsVehicle;
 
 // Physics world
@@ -145,6 +149,8 @@ typedef struct {
 
     float step_size;         // Physics timestep
     float accumulator;       // Time accumulator for fixed timestep
+
+    bool paused;             // World paused (for turn-based, maneuver setup)
 } PhysicsWorld;
 
 #ifdef __cplusplus
@@ -192,6 +198,31 @@ void physics_vehicle_get_lateral_velocity(PhysicsWorld* pw, int vehicle_id, floa
 void physics_vehicle_get_wheel_states(PhysicsWorld* pw, int vehicle_id, WheelState* wheels);
 void physics_vehicle_get_traction_info(PhysicsWorld* pw, int vehicle_id, float* force_n, float* traction);  // Debug: force & traction
 void physics_vehicle_get_handling(PhysicsWorld* pw, int vehicle_id, int* hs, int* hc);  // Current HS and base HC
+
+// World pause/unpause (for turn-based and maneuver execution)
+void physics_pause(PhysicsWorld* pw);
+void physics_unpause(PhysicsWorld* pw);
+bool physics_is_paused(PhysicsWorld* pw);
+
+// Maneuver system - autopilot-driven physics maneuvers
+// Start a maneuver (validates speed requirements, calculates target)
+bool physics_vehicle_start_maneuver(PhysicsWorld* pw, int vehicle_id,
+                                    ManeuverType type, ManeuverDirection direction);
+// Start maneuver with parameters (for bend angle, skid distance, etc.)
+bool physics_vehicle_start_maneuver_ex(PhysicsWorld* pw, int vehicle_id,
+                                       const ManeuverRequest* request);
+// Cancel active maneuver
+void physics_vehicle_cancel_maneuver(PhysicsWorld* pw, int vehicle_id);
+// Check if autopilot is active
+bool physics_vehicle_maneuver_active(PhysicsWorld* pw, int vehicle_id);
+// Get autopilot state for display
+const ManeuverAutopilot* physics_vehicle_get_autopilot(PhysicsWorld* pw, int vehicle_id);
+
+// Position/heading correction for maneuvers
+// Nudge position laterally (perpendicular to current heading)
+void physics_vehicle_nudge_lateral(PhysicsWorld* pw, int vehicle_id, float offset_meters);
+// Set exact heading (Y rotation in radians), preserving position and velocity
+void physics_vehicle_set_heading(PhysicsWorld* pw, int vehicle_id, float heading_radians);
 
 // Debug visualization - call between line_renderer_begin/end
 struct LineRenderer;  // Forward declare

@@ -245,6 +245,17 @@ void physics_step(PhysicsWorld* pw, float dt)
 {
     if (!pw || !pw->impl) return;
 
+    // If paused, don't step physics but still update wheel states for rendering
+    if (pw->paused) {
+        // Update wheel states even when paused (for visual consistency)
+        for (int i = 0; i < MAX_PHYSICS_VEHICLES; i++) {
+            PhysicsVehicle* v = &pw->vehicles[i];
+            if (!v->active || !v->impl) continue;
+            // Wheel state update is done below in main loop when unpaused
+        }
+        return;
+    }
+
     auto* impl = pw->impl;
 
     pw->accumulator += dt;
@@ -390,10 +401,61 @@ void physics_step(PhysicsWorld* pw, float dt)
                 // Don't add brake to last_applied_force - keep it throttle-only
             }
 
+            // ========== AUTOPILOT MANEUVER SYSTEM ==========
+            // When autopilot is active, it overrides player steering
+            float effectiveSteering = v->steering;
+
+            if (maneuver_is_active(&v->autopilot)) {
+                // Get current vehicle state for autopilot
+                RVec3 pos = bodyInterface.GetPosition(vimpl->bodyId);
+                JPH::Quat rot = bodyInterface.GetRotation(vimpl->bodyId);
+
+                // Convert to our types
+                ::Vec3 currentPos = { (float)pos.GetX(), (float)pos.GetY(), (float)pos.GetZ() };
+
+                // Extract heading from quaternion (rotation around Y axis)
+                // Jolt uses Z-forward convention
+                JPH::Vec3 fwd = rot.RotateAxisZ();
+                float currentHeading = atan2f(fwd.GetX(), fwd.GetZ());
+
+                // Update autopilot and get steering input
+                bool complete = false;
+                float autopilotSteer = maneuver_update(&v->autopilot,
+                                                       currentPos,
+                                                       currentHeading,
+                                                       speed,
+                                                       pw->step_size,
+                                                       &complete);
+
+                // Apply pending lateral nudge (after Phase 1 completes)
+                if (v->autopilot.lateral_nudge_pending) {
+                    v->autopilot.lateral_nudge_pending = false;
+                    physics_vehicle_nudge_lateral(pw, i, v->autopilot.lateral_nudge_amount);
+                }
+
+                // Apply pending heading correction (during CORRECTING animation or at end)
+                if (v->autopilot.heading_nudge_pending) {
+                    v->autopilot.heading_nudge_pending = false;
+                    physics_vehicle_set_heading(pw, i, v->autopilot.heading_nudge_target);
+                }
+
+                if (complete) {
+                    printf("[Maneuver] Autopilot complete, returning control\n");
+                    fflush(stdout);
+                    // Pause the world so user can inspect the final position
+                    pw->paused = true;
+                    printf("[Physics] World PAUSED (maneuver complete)\n");
+                    fflush(stdout);
+                } else {
+                    // Override steering with autopilot
+                    effectiveSteering = autopilotSteer;
+                }
+            }
+
             // Steering - use the vehicle constraint for wheel angles
             // (controller already obtained above for traction check)
             // Only pass steering to controller, no throttle (wheels unpowered)
-            controller->SetDriverInput(0.0f, v->steering, 0.0f, v->brake);
+            controller->SetDriverInput(0.0f, effectiveSteering, 0.0f, v->brake);
 
             // ========== ACCELERATION TEST ==========
             // Key-triggered test (T key), auto-ends at 60 mph
@@ -722,6 +784,10 @@ int physics_create_vehicle(PhysicsWorld* pw, ::Vec3 position, float rotation_y, 
     // Initialize handling system with calculated HC
     handling_init(&v->handling, config->handling_class);
 
+    // Initialize autopilot to idle state
+    memset(&v->autopilot, 0, sizeof(v->autopilot));
+    v->autopilot.state = AUTOPILOT_IDLE;
+
     auto* vimpl = v->impl;
 
     // Vehicle dimensions
@@ -865,6 +931,8 @@ int physics_create_vehicle(PhysicsWorld* pw, ::Vec3 position, float rotation_y, 
 
     // Single gear, not used for propulsion
     controllerSettings->mTransmission.mMode = ETransmissionMode::Auto;
+    controllerSettings->mTransmission.mShiftUpRPM = 0.5f;    // Must be < mMaxRPM for Auto mode
+    controllerSettings->mTransmission.mShiftDownRPM = 0.25f; // Must be < mShiftUpRPM
     controllerSettings->mTransmission.mGearRatios = { 1.0f };
     controllerSettings->mTransmission.mReverseGearRatios = { -1.0f };
 
@@ -1001,6 +1069,82 @@ void physics_vehicle_respawn(PhysicsWorld* pw, int vehicle_id)
     // Reset cruise control
     v->cruise_enabled = false;
     v->cruise_target_ms = 0.0f;
+}
+
+void physics_vehicle_nudge_lateral(PhysicsWorld* pw, int vehicle_id, float offset_meters)
+{
+    if (!pw || !pw->impl) return;
+    if (vehicle_id < 0 || vehicle_id >= MAX_PHYSICS_VEHICLES) return;
+
+    PhysicsVehicle* v = &pw->vehicles[vehicle_id];
+    if (!v->active || !v->impl) return;
+
+    auto* impl = pw->impl;
+    auto* vimpl = v->impl;
+    BodyInterface& bodyInterface = impl->physicsSystem->GetBodyInterface();
+
+    // Get current position and rotation
+    RVec3 pos = bodyInterface.GetPosition(vimpl->bodyId);
+    Quat rot = bodyInterface.GetRotation(vimpl->bodyId);
+
+    // Get heading from quaternion (Y-axis rotation)
+    float heading = atan2f(2.0f * (rot.GetW() * rot.GetY() + rot.GetX() * rot.GetZ()),
+                           1.0f - 2.0f * (rot.GetY() * rot.GetY() + rot.GetZ() * rot.GetZ()));
+
+    // Calculate lateral (right) vector: perpendicular to heading
+    float right_x = cosf(heading);
+    float right_z = -sinf(heading);
+
+    // Apply offset
+    pos.SetX(pos.GetX() + right_x * offset_meters);
+    pos.SetZ(pos.GetZ() + right_z * offset_meters);
+
+    // Set new position, keeping rotation and velocity
+    bodyInterface.SetPosition(vimpl->bodyId, pos, EActivation::Activate);
+
+    printf("[Physics] Nudged vehicle %d lateral by %.2fm\n", vehicle_id, offset_meters);
+}
+
+void physics_vehicle_set_heading(PhysicsWorld* pw, int vehicle_id, float heading_radians)
+{
+    if (!pw || !pw->impl) return;
+    if (vehicle_id < 0 || vehicle_id >= MAX_PHYSICS_VEHICLES) return;
+
+    PhysicsVehicle* v = &pw->vehicles[vehicle_id];
+    if (!v->active || !v->impl) return;
+
+    auto* impl = pw->impl;
+    auto* vimpl = v->impl;
+    BodyInterface& bodyInterface = impl->physicsSystem->GetBodyInterface();
+
+    // Get current state
+    RVec3 pos = bodyInterface.GetPosition(vimpl->bodyId);
+    Quat old_rot = bodyInterface.GetRotation(vimpl->bodyId);
+    JPH::Vec3 vel = bodyInterface.GetLinearVelocity(vimpl->bodyId);
+
+    // Get old heading from quaternion
+    float old_heading = atan2f(2.0f * (old_rot.GetW() * old_rot.GetY() + old_rot.GetX() * old_rot.GetZ()),
+                               1.0f - 2.0f * (old_rot.GetY() * old_rot.GetY() + old_rot.GetZ() * old_rot.GetZ()));
+
+    // Create new rotation from target heading
+    Quat rotation = Quat::sRotation(JPH::Vec3::sAxisY(), heading_radians);
+
+    // Rotate velocity vector by the same delta to prevent "crab" effect
+    float heading_delta = heading_radians - old_heading;
+    float cos_d = cosf(heading_delta);
+    float sin_d = sinf(heading_delta);
+    float new_vel_x = vel.GetX() * cos_d - vel.GetZ() * sin_d;
+    float new_vel_z = vel.GetX() * sin_d + vel.GetZ() * cos_d;
+    JPH::Vec3 new_vel(new_vel_x, vel.GetY(), new_vel_z);
+
+    // Apply changes
+    bodyInterface.SetPositionAndRotation(vimpl->bodyId, pos, rotation, EActivation::Activate);
+    bodyInterface.SetLinearVelocity(vimpl->bodyId, new_vel);
+    bodyInterface.SetAngularVelocity(vimpl->bodyId, JPH::Vec3::sZero());
+
+    printf("[Physics] Set vehicle %d heading to %.1f° (was %.1f°, delta %.1f°)\n",
+           vehicle_id, heading_radians * 180.0f / 3.14159f,
+           old_heading * 180.0f / 3.14159f, heading_delta * 180.0f / 3.14159f);
 }
 
 void physics_vehicle_start_accel_test(PhysicsWorld* pw, int vehicle_id)
@@ -1468,6 +1612,122 @@ void physics_vehicle_get_handling(PhysicsWorld* pw, int vehicle_id, int* hs, int
 
     if (hs) *hs = v->handling.handling_status;
     if (hc) *hc = v->handling.handling_class;
+}
+
+// ========== WORLD PAUSE/UNPAUSE ==========
+
+void physics_pause(PhysicsWorld* pw)
+{
+    if (!pw) return;
+    pw->paused = true;
+    printf("[Physics] World PAUSED\n");
+    fflush(stdout);
+}
+
+void physics_unpause(PhysicsWorld* pw)
+{
+    if (!pw) return;
+    pw->paused = false;
+    printf("[Physics] World UNPAUSED\n");
+    fflush(stdout);
+}
+
+bool physics_is_paused(PhysicsWorld* pw)
+{
+    if (!pw) return false;
+    return pw->paused;
+}
+
+// ========== MANEUVER SYSTEM ==========
+
+bool physics_vehicle_start_maneuver(PhysicsWorld* pw, int vehicle_id,
+                                    ManeuverType type, ManeuverDirection direction)
+{
+    ManeuverRequest req = {};
+    req.type = type;
+    req.direction = direction;
+    req.bend_angle = 0;
+    req.skid_distance = 0;
+    return physics_vehicle_start_maneuver_ex(pw, vehicle_id, &req);
+}
+
+bool physics_vehicle_start_maneuver_ex(PhysicsWorld* pw, int vehicle_id,
+                                       const ManeuverRequest* request)
+{
+    if (!pw || !pw->impl) return false;
+    if (vehicle_id < 0 || vehicle_id >= MAX_PHYSICS_VEHICLES) return false;
+
+    PhysicsVehicle* v = &pw->vehicles[vehicle_id];
+    if (!v->active || !v->impl) return false;
+
+    auto* impl = pw->impl;
+    auto* vimpl = v->impl;
+    BodyInterface& bodyInterface = impl->physicsSystem->GetBodyInterface();
+
+    // Get current vehicle state
+    RVec3 pos = bodyInterface.GetPosition(vimpl->bodyId);
+    JPH::Quat rot = bodyInterface.GetRotation(vimpl->bodyId);
+    JPH::Vec3 vel = bodyInterface.GetLinearVelocity(vimpl->bodyId);
+
+    ::Vec3 currentPos = { (float)pos.GetX(), (float)pos.GetY(), (float)pos.GetZ() };
+    float speed = vel.Length();
+
+    // Extract heading from quaternion
+    JPH::Vec3 fwd = rot.RotateAxisZ();
+    float currentHeading = atan2f(fwd.GetX(), fwd.GetZ());
+
+    // Start the maneuver
+    bool success = maneuver_start(&v->autopilot, request, currentPos, currentHeading, speed);
+
+    if (success) {
+        // Apply handling difficulty
+        int difficulty = maneuver_get_difficulty(request->type, request->direction,
+                                                  request->bend_angle > 0 ? request->bend_angle : request->skid_distance);
+        ControlResult result = handling_apply_maneuver(&v->handling, difficulty);
+
+        if (result == CONTROL_ROLL_FAILED) {
+            // Maneuver failed - need to handle crash table
+            // For now, just log it - crash table implementation comes later
+            printf("[Maneuver] Control roll FAILED - crash table needed (not implemented)\n");
+            fflush(stdout);
+            // Continue with maneuver anyway for testing
+        }
+    }
+
+    return success;
+}
+
+void physics_vehicle_cancel_maneuver(PhysicsWorld* pw, int vehicle_id)
+{
+    if (!pw) return;
+    if (vehicle_id < 0 || vehicle_id >= MAX_PHYSICS_VEHICLES) return;
+
+    PhysicsVehicle* v = &pw->vehicles[vehicle_id];
+    if (!v->active) return;
+
+    maneuver_cancel(&v->autopilot);
+}
+
+bool physics_vehicle_maneuver_active(PhysicsWorld* pw, int vehicle_id)
+{
+    if (!pw) return false;
+    if (vehicle_id < 0 || vehicle_id >= MAX_PHYSICS_VEHICLES) return false;
+
+    PhysicsVehicle* v = &pw->vehicles[vehicle_id];
+    if (!v->active) return false;
+
+    return maneuver_is_active(&v->autopilot);
+}
+
+const ManeuverAutopilot* physics_vehicle_get_autopilot(PhysicsWorld* pw, int vehicle_id)
+{
+    if (!pw) return nullptr;
+    if (vehicle_id < 0 || vehicle_id >= MAX_PHYSICS_VEHICLES) return nullptr;
+
+    PhysicsVehicle* v = &pw->vehicles[vehicle_id];
+    if (!v->active) return nullptr;
+
+    return &v->autopilot;
 }
 
 } // extern "C"

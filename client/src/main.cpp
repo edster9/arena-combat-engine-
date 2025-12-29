@@ -821,6 +821,56 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        // ========== PHYSICS PAUSE ==========
+        // TAB = toggle physics pause
+        if (input.keys_pressed[KEY_TAB]) {
+            if (physics_is_paused(&physics)) {
+                physics_unpause(&physics);
+            } else {
+                physics_pause(&physics);
+            }
+        }
+
+        // ========== MANEUVER KEYS ==========
+        // Only work when physics is paused and vehicle is selected
+        // 1 = Drift LEFT, 2 = Drift RIGHT
+        // 3 = Steep Drift LEFT, 4 = Steep Drift RIGHT
+        Entity* sel_for_maneuver = entity_manager_get_selected(&entities);
+        int sel_phys_id = (sel_for_maneuver && sel_for_maneuver->id < MAX_ENTITIES)
+                          ? entity_to_physics[sel_for_maneuver->id] : -1;
+
+        bool shift_held_for_maneuver = input.keys[KEY_LSHIFT] || input.keys[KEY_RSHIFT];
+        if (sel_phys_id >= 0 && physics_is_paused(&physics) && !shift_held_for_maneuver) {
+            // Drift LEFT with 1
+            if (input.keys_pressed[KEY_1]) {
+                if (physics_vehicle_start_maneuver(&physics, sel_phys_id, MANEUVER_DRIFT, MANEUVER_LEFT)) {
+                    physics_unpause(&physics);  // Auto-unpause to execute
+                }
+            }
+            // Drift RIGHT with 2
+            if (input.keys_pressed[KEY_2]) {
+                if (physics_vehicle_start_maneuver(&physics, sel_phys_id, MANEUVER_DRIFT, MANEUVER_RIGHT)) {
+                    physics_unpause(&physics);  // Auto-unpause to execute
+                }
+            }
+            // Steep Drift LEFT with 3
+            if (input.keys_pressed[KEY_3]) {
+                if (physics_vehicle_start_maneuver(&physics, sel_phys_id, MANEUVER_STEEP_DRIFT, MANEUVER_LEFT)) {
+                    physics_unpause(&physics);  // Auto-unpause to execute
+                }
+            }
+            // Steep Drift RIGHT with 4
+            if (input.keys_pressed[KEY_4]) {
+                if (physics_vehicle_start_maneuver(&physics, sel_phys_id, MANEUVER_STEEP_DRIFT, MANEUVER_RIGHT)) {
+                    physics_unpause(&physics);  // Auto-unpause to execute
+                }
+            }
+            // Cancel maneuver with 0
+            if (input.keys_pressed[KEY_0]) {
+                physics_vehicle_cancel_maneuver(&physics, sel_phys_id);
+            }
+        }
+
         // Left click handling (UI buttons first, then 3D picking)
         if (input.mouse_pressed[MOUSE_LEFT] && !input.mouse_captured) {
             float mx = (float)input.mouse_x;
