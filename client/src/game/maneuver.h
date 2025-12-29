@@ -38,6 +38,7 @@ typedef enum {
     MANEUVER_NONE = 0,
 
     // Basic maneuvers (Phase 2)
+    MANEUVER_STRAIGHT,        // D0: no lateral, no heading change - just move forward
     MANEUVER_DRIFT,           // D1: 1/4" lateral, keep heading
     MANEUVER_STEEP_DRIFT,     // D3: 1/2" lateral, keep heading
     MANEUVER_BEND,            // D1-D6: turn with heading change
@@ -98,6 +99,12 @@ typedef struct {
     // Target state (calculated from Car Wars rules)
     Vec3 target_position;
     float target_heading;         // Radians
+
+    // Arc path parameters (for BEND maneuvers)
+    bool is_arc_path;             // True if following arc instead of linear
+    float arc_radius;             // Radius of turn circle (meters)
+    Vec3 arc_center;              // Center of turn circle (world coords)
+    float arc_angle;              // Total angle to sweep (radians, signed)
 
     // Timing
     float elapsed;                // Seconds since maneuver started
