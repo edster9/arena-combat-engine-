@@ -159,6 +159,12 @@ static bool AssertFailedImpl(const char* inExpression, const char* inMessage, co
 
 static bool sJoltInitialized = false;
 
+// Kinematic mode tracking - separate from Jolt's motion type
+// We can't use Jolt's EMotionType::Kinematic because WheeledVehicleConstraint
+// doesn't support it (asserts on dynamic motion type). Instead, we track
+// kinematic state ourselves and just directly set position/rotation.
+static bool sVehicleKinematicMode[MAX_PHYSICS_VEHICLES] = {false};
+
 // No traction control needed - wheels are unpowered in matchbox mode
 
 extern "C" {
@@ -347,6 +353,48 @@ void physics_step(PhysicsWorld* pw, float dt)
             // ========== WHEEL TRACTION CHECK ==========
             // Count wheels in contact with ground - scale force by traction
             // This prevents acceleration while airborne or flipped
+            // ========== KINEMATIC MANEUVER SYSTEM ==========
+            // When maneuver is active, vehicle is in kinematic mode
+            // Skip all normal physics and animate along calculated path
+            if (maneuver_is_active(&v->autopilot)) {
+                // Ensure vehicle is in kinematic mode
+                if (!physics_vehicle_is_kinematic(pw, i)) {
+                    physics_vehicle_set_kinematic(pw, i, true);
+                }
+
+                // Update maneuver and get interpolated pose
+                bool complete = false;
+                ManeuverPose pose = maneuver_update(&v->autopilot, pw->step_size, &complete);
+
+                if (complete) {
+                    // Maneuver complete - switch back to dynamic mode
+                    physics_vehicle_set_kinematic(pw, i, false);
+
+                    // Set exit velocity in direction of final heading
+                    ::Vec3 exitVel = maneuver_get_exit_velocity(&v->autopilot);
+                    physics_vehicle_set_velocity(pw, i, exitVel);
+
+                    printf("[Maneuver] Kinematic animation complete, returning control\n");
+                    fflush(stdout);
+
+                    // Pause the world so user can inspect the final position
+                    pw->paused = true;
+                    printf("[Physics] World PAUSED (maneuver complete)\n");
+                    fflush(stdout);
+                } else {
+                    // Move kinematic body to interpolated pose
+                    physics_vehicle_move_kinematic(pw, i, pose.position, pose.heading, pw->step_size);
+                }
+
+                // Skip normal physics when in kinematic mode
+                continue;
+            }
+
+            // Ensure vehicle is in dynamic mode when not maneuvering
+            if (physics_vehicle_is_kinematic(pw, i)) {
+                physics_vehicle_set_kinematic(pw, i, false);
+            }
+
             WheeledVehicleController* controller = static_cast<WheeledVehicleController*>(
                 vimpl->constraint->GetController());
             const Wheels& wheels = vimpl->constraint->GetWheels();
@@ -401,61 +449,9 @@ void physics_step(PhysicsWorld* pw, float dt)
                 // Don't add brake to last_applied_force - keep it throttle-only
             }
 
-            // ========== AUTOPILOT MANEUVER SYSTEM ==========
-            // When autopilot is active, it overrides player steering
-            float effectiveSteering = v->steering;
-
-            if (maneuver_is_active(&v->autopilot)) {
-                // Get current vehicle state for autopilot
-                RVec3 pos = bodyInterface.GetPosition(vimpl->bodyId);
-                JPH::Quat rot = bodyInterface.GetRotation(vimpl->bodyId);
-
-                // Convert to our types
-                ::Vec3 currentPos = { (float)pos.GetX(), (float)pos.GetY(), (float)pos.GetZ() };
-
-                // Extract heading from quaternion (rotation around Y axis)
-                // Jolt uses Z-forward convention
-                JPH::Vec3 fwd = rot.RotateAxisZ();
-                float currentHeading = atan2f(fwd.GetX(), fwd.GetZ());
-
-                // Update autopilot and get steering input
-                bool complete = false;
-                float autopilotSteer = maneuver_update(&v->autopilot,
-                                                       currentPos,
-                                                       currentHeading,
-                                                       speed,
-                                                       pw->step_size,
-                                                       &complete);
-
-                // Apply pending lateral nudge (after Phase 1 completes)
-                if (v->autopilot.lateral_nudge_pending) {
-                    v->autopilot.lateral_nudge_pending = false;
-                    physics_vehicle_nudge_lateral(pw, i, v->autopilot.lateral_nudge_amount);
-                }
-
-                // Apply pending heading correction (during CORRECTING animation or at end)
-                if (v->autopilot.heading_nudge_pending) {
-                    v->autopilot.heading_nudge_pending = false;
-                    physics_vehicle_set_heading(pw, i, v->autopilot.heading_nudge_target);
-                }
-
-                if (complete) {
-                    printf("[Maneuver] Autopilot complete, returning control\n");
-                    fflush(stdout);
-                    // Pause the world so user can inspect the final position
-                    pw->paused = true;
-                    printf("[Physics] World PAUSED (maneuver complete)\n");
-                    fflush(stdout);
-                } else {
-                    // Override steering with autopilot
-                    effectiveSteering = autopilotSteer;
-                }
-            }
-
             // Steering - use the vehicle constraint for wheel angles
-            // (controller already obtained above for traction check)
             // Only pass steering to controller, no throttle (wheels unpowered)
-            controller->SetDriverInput(0.0f, effectiveSteering, 0.0f, v->brake);
+            controller->SetDriverInput(0.0f, v->steering, 0.0f, v->brake);
 
             // ========== ACCELERATION TEST ==========
             // Key-triggered test (T key), auto-ends at 60 mph
@@ -788,6 +784,9 @@ int physics_create_vehicle(PhysicsWorld* pw, ::Vec3 position, float rotation_y, 
     memset(&v->autopilot, 0, sizeof(v->autopilot));
     v->autopilot.state = AUTOPILOT_IDLE;
 
+    // Reset kinematic flag for this slot
+    sVehicleKinematicMode[slot] = false;
+
     auto* vimpl = v->impl;
 
     // Vehicle dimensions
@@ -999,6 +998,7 @@ void physics_destroy_vehicle(PhysicsWorld* pw, int vehicle_id)
     delete vimpl;
     v->impl = nullptr;
     v->active = false;
+    sVehicleKinematicMode[vehicle_id] = false;
     pw->vehicle_count--;
 }
 
@@ -1145,6 +1145,97 @@ void physics_vehicle_set_heading(PhysicsWorld* pw, int vehicle_id, float heading
     printf("[Physics] Set vehicle %d heading to %.1f° (was %.1f°, delta %.1f°)\n",
            vehicle_id, heading_radians * 180.0f / 3.14159f,
            old_heading * 180.0f / 3.14159f, heading_delta * 180.0f / 3.14159f);
+}
+
+void physics_vehicle_set_kinematic(PhysicsWorld* pw, int vehicle_id, bool kinematic)
+{
+    if (!pw || !pw->impl) return;
+    if (vehicle_id < 0 || vehicle_id >= MAX_PHYSICS_VEHICLES) return;
+
+    PhysicsVehicle* v = &pw->vehicles[vehicle_id];
+    if (!v->active || !v->impl) return;
+
+    // NOTE: We DON'T use Jolt's EMotionType::Kinematic because the
+    // WheeledVehicleConstraint doesn't support it (asserts on dynamic type).
+    // Instead, we track kinematic state ourselves and skip force application
+    // when in kinematic mode, directly setting position/rotation instead.
+    sVehicleKinematicMode[vehicle_id] = kinematic;
+
+    if (kinematic) {
+        printf("[Physics] Vehicle %d set to KINEMATIC mode (soft)\n", vehicle_id);
+    } else {
+        printf("[Physics] Vehicle %d set to DYNAMIC mode\n", vehicle_id);
+    }
+}
+
+bool physics_vehicle_is_kinematic(PhysicsWorld* pw, int vehicle_id)
+{
+    if (!pw || !pw->impl) return false;
+    if (vehicle_id < 0 || vehicle_id >= MAX_PHYSICS_VEHICLES) return false;
+
+    PhysicsVehicle* v = &pw->vehicles[vehicle_id];
+    if (!v->active || !v->impl) return false;
+
+    // Check our tracked kinematic state (not Jolt's motion type)
+    return sVehicleKinematicMode[vehicle_id];
+}
+
+void physics_vehicle_move_kinematic(PhysicsWorld* pw, int vehicle_id,
+                                    ::Vec3 target_pos, float target_heading, float dt)
+{
+    if (!pw || !pw->impl) return;
+    if (vehicle_id < 0 || vehicle_id >= MAX_PHYSICS_VEHICLES) return;
+
+    PhysicsVehicle* v = &pw->vehicles[vehicle_id];
+    if (!v->active || !v->impl) return;
+
+    auto* impl = pw->impl;
+    auto* vimpl = v->impl;
+    BodyInterface& bodyInterface = impl->physicsSystem->GetBodyInterface();
+
+    // Create target position and rotation
+    RVec3 targetPosition(target_pos.x, target_pos.y, target_pos.z);
+    Quat targetRotation = Quat::sRotation(JPH::Vec3::sAxisY(), target_heading);
+
+    // Since we keep the body Dynamic (to avoid WheeledVehicleConstraint issues),
+    // directly set position and rotation, and also set velocity to match our
+    // interpolated motion so physics doesn't fight us.
+    RVec3 currentPos = bodyInterface.GetPosition(vimpl->bodyId);
+
+    // Calculate velocity from position delta (to avoid body fighting us)
+    if (dt > 0.001f) {
+        JPH::Vec3 deltaPos(
+            (float)(targetPosition.GetX() - currentPos.GetX()),
+            (float)(targetPosition.GetY() - currentPos.GetY()),
+            (float)(targetPosition.GetZ() - currentPos.GetZ())
+        );
+        JPH::Vec3 velocity = deltaPos / dt;
+        bodyInterface.SetLinearVelocity(vimpl->bodyId, velocity);
+    }
+
+    // Set position and rotation directly
+    bodyInterface.SetPositionAndRotation(vimpl->bodyId, targetPosition, targetRotation, EActivation::Activate);
+    bodyInterface.SetAngularVelocity(vimpl->bodyId, JPH::Vec3::sZero());
+}
+
+void physics_vehicle_set_velocity(PhysicsWorld* pw, int vehicle_id, ::Vec3 velocity)
+{
+    if (!pw || !pw->impl) return;
+    if (vehicle_id < 0 || vehicle_id >= MAX_PHYSICS_VEHICLES) return;
+
+    PhysicsVehicle* v = &pw->vehicles[vehicle_id];
+    if (!v->active || !v->impl) return;
+
+    auto* impl = pw->impl;
+    auto* vimpl = v->impl;
+    BodyInterface& bodyInterface = impl->physicsSystem->GetBodyInterface();
+
+    JPH::Vec3 vel(velocity.x, velocity.y, velocity.z);
+    bodyInterface.SetLinearVelocity(vimpl->bodyId, vel);
+    bodyInterface.SetAngularVelocity(vimpl->bodyId, JPH::Vec3::sZero());
+
+    printf("[Physics] Set vehicle %d velocity to (%.1f, %.1f, %.1f) m/s\n",
+           vehicle_id, velocity.x, velocity.y, velocity.z);
 }
 
 void physics_vehicle_start_accel_test(PhysicsWorld* pw, int vehicle_id)

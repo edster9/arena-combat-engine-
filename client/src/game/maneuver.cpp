@@ -1,5 +1,8 @@
 /*
- * Car Wars Maneuver System Implementation
+ * Car Wars Maneuver System - Kinematic Path Animation
+ *
+ * Uses linear interpolation (lerp) between start and end poses.
+ * Vehicle is in kinematic mode during maneuver execution.
  */
 
 #include "maneuver.h"
@@ -10,33 +13,14 @@
 // Speed conversion
 #define MS_TO_MPH 2.237f
 #define MPH_TO_MS 0.447f
-
-// Tuning parameters for autopilot steering
-// These will need empirical adjustment like the K acceleration factors
-typedef struct {
-    float steer_duration;     // How long to steer (seconds)
-    float steer_intensity;    // How hard to steer (0-1)
-    float return_duration;    // How long to counter-steer to straighten
-    float return_intensity;   // Counter-steer intensity
-} SteeringProfile;
-
-// Steering profiles per maneuver type (tuned empirically)
-// Format: { steer_duration, steer_intensity, return_duration, return_intensity }
-// Test 1 @ 20mph: 0.5/0.3 → 57% accuracy, -7.9° heading drift
-// Test 2 @ 20mph: 0.85/0.6 → 57% (early complete)
-// Test 3 @ 20mph: 0.85/0.6 + tight tol → 81% accuracy, -10.7° heading
-// Test 4 @ 20mph: 1.0/0.9, 50%/90% → 81% accuracy, -10.9° heading
-// Test 5 @ 20mph: 1.0/0.9, 35%/95% → 31% accuracy, +0.9° heading (overcorrected!)
-// Test 6 @ 20mph: 1.0/0.7, 45%/90% → ?
-static const SteeringProfile s_drift_profile = { 0.3f, 1.0f, 0.2f, 0.7f };
-static const SteeringProfile s_steep_drift_profile = { 0.4f, 1.0f, 0.25f, 0.8f };
+#define PI 3.14159265359f
 
 // Speed requirements (in m/s)
-static const float PIVOT_SPEED_EXACT = 5.0f * MPH_TO_MS;    // 5 mph exactly
-static const float PIVOT_SPEED_TOLERANCE = 1.0f * MPH_TO_MS; // +/- 1 mph
-static const float T_STOP_MIN_SPEED = 10.0f * MPH_TO_MS;     // 10 mph minimum
-static const float BOOTLEGGER_MIN_SPEED = 20.0f * MPH_TO_MS; // 20 mph
-static const float BOOTLEGGER_MAX_SPEED = 35.0f * MPH_TO_MS; // 35 mph
+static const float PIVOT_SPEED_EXACT = 5.0f * MPH_TO_MS;
+static const float PIVOT_SPEED_TOLERANCE = 1.0f * MPH_TO_MS;
+static const float T_STOP_MIN_SPEED = 10.0f * MPH_TO_MS;
+static const float BOOTLEGGER_MIN_SPEED = 20.0f * MPH_TO_MS;
+static const float BOOTLEGGER_MAX_SPEED = 35.0f * MPH_TO_MS;
 
 const char* maneuver_get_name(ManeuverType type) {
     switch (type) {
@@ -67,8 +51,6 @@ const char* maneuver_get_status(const ManeuverAutopilot* ap) {
 }
 
 bool maneuver_validate(ManeuverType type, float speed_ms, const char** out_reason) {
-    float speed_mph = speed_ms * MS_TO_MPH;
-
     switch (type) {
         case MANEUVER_PIVOT:
             if (fabsf(speed_ms - PIVOT_SPEED_EXACT) > PIVOT_SPEED_TOLERANCE) {
@@ -100,7 +82,7 @@ bool maneuver_validate(ManeuverType type, float speed_ms, const char** out_reaso
         case MANEUVER_BEND:
         case MANEUVER_SWERVE:
         case MANEUVER_CONTROLLED_SKID:
-            // These can be performed at any speed (handling penalties apply at high speed)
+            // These can be performed at any speed
             break;
 
         default:
@@ -113,6 +95,8 @@ bool maneuver_validate(ManeuverType type, float speed_ms, const char** out_reaso
 }
 
 int maneuver_get_difficulty(ManeuverType type, ManeuverDirection dir, int param) {
+    (void)dir;  // Unused for now
+
     switch (type) {
         case MANEUVER_DRIFT:
             return 1;  // D1
@@ -122,24 +106,21 @@ int maneuver_get_difficulty(ManeuverType type, ManeuverDirection dir, int param)
 
         case MANEUVER_BEND:
             // D value based on angle: 15°=D1, 30°=D2, 45°=D3, 60°=D4, 75°=D5, 90°=D6
-            return (param + 14) / 15;  // Integer division rounds down
+            return (param + 14) / 15;
 
         case MANEUVER_PIVOT:
             return 0;  // D0
 
         case MANEUVER_T_STOP:
-            // D1 per 10 mph of speed
-            return param;  // param should be speed/10
+            return param;  // D1 per 10 mph
 
         case MANEUVER_BOOTLEGGER:
             return 7;  // D7
 
         case MANEUVER_SWERVE:
-            // Drift + Bend, +1 difficulty
-            return param + 1;  // param is the bend difficulty
+            return param + 1;  // Drift + Bend, +1 difficulty
 
         case MANEUVER_CONTROLLED_SKID:
-            // +1 to +4 based on distance
             return param;  // 1-4 quarter inches
 
         default:
@@ -147,21 +128,33 @@ int maneuver_get_difficulty(ManeuverType type, ManeuverDirection dir, int param)
     }
 }
 
-// Calculate target position for a maneuver
-static void calculate_target(ManeuverAutopilot* ap,
-                             Vec3 start_pos,
-                             float start_heading,
-                             float speed_ms) {
+// Simple linear interpolation
+static float lerp(float a, float b, float t) {
+    return a + (b - a) * t;
+}
+
+// Ease in-out curve for smoother motion
+static float ease_in_out(float t) {
+    // Smoothstep: 3t² - 2t³
+    return t * t * (3.0f - 2.0f * t);
+}
+
+// Shortest angle lerp (handles wrapping)
+static float angle_lerp(float a, float b, float t) {
+    float diff = b - a;
+    // Normalize to -PI to PI
+    while (diff > PI) diff -= 2.0f * PI;
+    while (diff < -PI) diff += 2.0f * PI;
+    return a + diff * t;
+}
+
+// Calculate target position and heading for a maneuver
+static void calculate_target(ManeuverAutopilot* ap) {
     float dir = (float)ap->request.direction;  // -1 or 1
 
-    // Default: maintain speed and heading
-    ap->target_speed_ms = speed_ms;
-    ap->target_heading = start_heading;
-
     // Calculate lateral offset in world coordinates
-    // heading = 0 means facing +Z, so right is +X
-    float sin_h = sinf(start_heading);
-    float cos_h = cosf(start_heading);
+    float sin_h = sinf(ap->start_heading);
+    float cos_h = cosf(ap->start_heading);
 
     // Right vector (perpendicular to heading)
     float right_x = cos_h;
@@ -171,49 +164,48 @@ static void calculate_target(ManeuverAutopilot* ap,
     float fwd_x = sin_h;
     float fwd_z = cos_h;
 
-    // Forward distance during maneuver (based on speed and expected duration)
-    float fwd_dist = 0.0f;
+    // Calculate lateral displacement based on maneuver type
+    float lateral = 0.0f;
+    float heading_change = 0.0f;
 
     switch (ap->request.type) {
         case MANEUVER_DRIFT:
-            // 1/4" lateral displacement, maintain heading
-            ap->target_position.x = start_pos.x + right_x * CW_QUARTER_INCH * dir;
-            ap->target_position.y = start_pos.y;
-            ap->target_position.z = start_pos.z + right_z * CW_QUARTER_INCH * dir;
-
-            // Add forward movement based on speed
-            fwd_dist = speed_ms * ap->expected_duration;
-            ap->target_position.x += fwd_x * fwd_dist;
-            ap->target_position.z += fwd_z * fwd_dist;
+            lateral = CW_QUARTER_INCH * dir;
+            heading_change = 0.0f;  // Maintain heading
             break;
 
         case MANEUVER_STEEP_DRIFT:
-            // 1/2" lateral displacement, maintain heading
-            ap->target_position.x = start_pos.x + right_x * CW_HALF_INCH * dir;
-            ap->target_position.y = start_pos.y;
-            ap->target_position.z = start_pos.z + right_z * CW_HALF_INCH * dir;
-
-            // Add forward movement
-            fwd_dist = speed_ms * ap->expected_duration;
-            ap->target_position.x += fwd_x * fwd_dist;
-            ap->target_position.z += fwd_z * fwd_dist;
+            lateral = CW_HALF_INCH * dir;
+            heading_change = 0.0f;
             break;
 
         case MANEUVER_BEND:
-            // TODO: Implement arc movement with heading change
-            ap->target_heading = start_heading + (float)ap->request.bend_angle * (3.14159f / 180.0f) * dir;
-            ap->target_position = start_pos;  // Placeholder
+            heading_change = (float)ap->request.bend_angle * (PI / 180.0f) * dir;
+            // TODO: Calculate arc path
+            lateral = 0.0f;
+            break;
+
+        case MANEUVER_BOOTLEGGER:
+            heading_change = PI * dir;  // 180° turn
+            lateral = 0.0f;
             break;
 
         default:
-            // Placeholder for other maneuvers
-            ap->target_position = start_pos;
+            lateral = 0.0f;
+            heading_change = 0.0f;
             break;
     }
 
-    printf("[Maneuver] Target: pos=(%.2f, %.2f, %.2f) heading=%.1f°\n",
-           ap->target_position.x, ap->target_position.y, ap->target_position.z,
-           ap->target_heading * 180.0f / 3.14159f);
+    // Forward distance during maneuver (based on speed and duration)
+    float fwd_dist = ap->start_speed_ms * ap->duration;
+
+    // Calculate target position
+    ap->target_position.x = ap->start_position.x + right_x * lateral + fwd_x * fwd_dist;
+    ap->target_position.y = ap->start_position.y;  // Keep Y constant
+    ap->target_position.z = ap->start_position.z + right_z * lateral + fwd_z * fwd_dist;
+
+    // Calculate target heading
+    ap->target_heading = ap->start_heading + heading_change;
 }
 
 bool maneuver_start(ManeuverAutopilot* ap,
@@ -231,7 +223,7 @@ bool maneuver_start(ManeuverAutopilot* ap,
 
     // Initialize autopilot state
     memset(ap, 0, sizeof(*ap));
-    ap->state = AUTOPILOT_STARTING;
+    ap->state = AUTOPILOT_EXECUTING;
     ap->request = *request;
 
     // Capture start state
@@ -239,308 +231,141 @@ bool maneuver_start(ManeuverAutopilot* ap,
     ap->start_heading = current_heading;
     ap->start_speed_ms = current_speed_ms;
 
-    // Calculate expected duration based on speed and maneuver distance
-    // Maneuver covers some forward distance while executing
-    float target_lateral = 0.0f;
-    switch (request->type) {
-        case MANEUVER_DRIFT:
-            target_lateral = CW_QUARTER_INCH;
-            break;
-        case MANEUVER_STEEP_DRIFT:
-            target_lateral = CW_HALF_INCH;
-            break;
-        default:
-            target_lateral = CW_QUARTER_INCH;  // Default
-            break;
-    }
-
-    // Duration: time to cover forward while drifting
-    // At 20mph (8.8 m/s), 6m = 0.68s was too short
-    // Try 10m = 1.14s for more time to complete steering phases
-    float forward_dist = 10.0f;  // ~2.5 car lengths
-    ap->expected_duration = forward_dist / fmaxf(current_speed_ms, 5.0f);
-    ap->timeout = ap->expected_duration * 3.0f;  // 3x safety margin
-
-    // Tolerances for completion detection
-    // Use ~10% of target as tolerance (0.15m for 1.14m drift target)
-    ap->position_tolerance = 0.15f;  // 0.15 meter tolerance (~10%)
-    ap->heading_tolerance = 0.1f;    // ~6 degrees
+    // Calculate duration based on forward distance covered
+    // At 20 mph (~9 m/s), covering ~10m takes ~1.1s
+    float forward_dist = 10.0f;  // meters to travel
+    ap->duration = forward_dist / fmaxf(current_speed_ms, 2.0f);
+    ap->elapsed = 0.0f;
+    ap->progress = 0.0f;
 
     // Calculate target
-    calculate_target(ap, current_pos, current_heading, current_speed_ms);
+    calculate_target(ap);
 
-    // ========== DETAILED DEBUG OUTPUT ==========
+    // Initialize current pose to start
+    ap->current_pose.position = current_pos;
+    ap->current_pose.heading = current_heading;
+
+    // Get lateral displacement for display
+    float lateral_target = 0.0f;
+    switch (request->type) {
+        case MANEUVER_DRIFT: lateral_target = CW_QUARTER_INCH; break;
+        case MANEUVER_STEEP_DRIFT: lateral_target = CW_HALF_INCH; break;
+        default: lateral_target = 0.0f; break;
+    }
+
+    // Debug output
     printf("\n");
     printf("╔══════════════════════════════════════════════════════════════╗\n");
-    printf("║               MANEUVER AUTOPILOT START                       ║\n");
+    printf("║            KINEMATIC MANEUVER START                          ║\n");
     printf("╠══════════════════════════════════════════════════════════════╣\n");
     printf("║ Type: %-20s Direction: %-10s          ║\n",
            maneuver_get_name(request->type),
            request->direction == MANEUVER_LEFT ? "LEFT" : "RIGHT");
     printf("╠══════════════════════════════════════════════════════════════╣\n");
-    printf("║ START STATE:                                                 ║\n");
-    printf("║   Position: (%.2f, %.2f, %.2f)                            \n",
-           current_pos.x, current_pos.y, current_pos.z);
-    printf("║   Heading:  %.1f°                                           \n",
-           current_heading * 180.0f / 3.14159f);
-    printf("║   Speed:    %.1f mph (%.1f m/s)                             \n",
-           current_speed_ms * MS_TO_MPH, current_speed_ms);
+    printf("║ START:  pos=(%.1f, %.1f, %.1f) heading=%.1f°               \n",
+           current_pos.x, current_pos.y, current_pos.z,
+           current_heading * 180.0f / PI);
+    printf("║ TARGET: pos=(%.1f, %.1f, %.1f) heading=%.1f°               \n",
+           ap->target_position.x, ap->target_position.y, ap->target_position.z,
+           ap->target_heading * 180.0f / PI);
     printf("╠══════════════════════════════════════════════════════════════╣\n");
-    printf("║ TARGET:                                                      ║\n");
-    printf("║   Lateral:  %.2fm %s (Car Wars: %.2f\")                    \n",
-           target_lateral, request->direction == MANEUVER_LEFT ? "LEFT" : "RIGHT",
-           target_lateral / CW_INCH_TO_METERS);
-    printf("║   Duration: %.2fs (timeout: %.2fs)                          \n",
-           ap->expected_duration, ap->timeout);
+    printf("║ Lateral: %.2fm %s | Duration: %.2fs | Speed: %.1f mph       \n",
+           lateral_target,
+           request->direction == MANEUVER_LEFT ? "LEFT" : "RIGHT",
+           ap->duration,
+           current_speed_ms * MS_TO_MPH);
     printf("╚══════════════════════════════════════════════════════════════╝\n");
     fflush(stdout);
 
-    ap->state = AUTOPILOT_EXECUTING;
     return true;
 }
 
-// Track last progress print to avoid spamming
-static float s_last_progress_print = -1.0f;
-
-float maneuver_update(ManeuverAutopilot* ap,
-                      Vec3 current_pos,
-                      float current_heading,
-                      float current_speed_ms,
-                      float dt,
-                      bool* out_complete) {
+ManeuverPose maneuver_update(ManeuverAutopilot* ap,
+                             float dt,
+                             bool* out_complete) {
     *out_complete = false;
 
-    if (ap->state == AUTOPILOT_IDLE ||
-        ap->state == AUTOPILOT_FINISHED ||
-        ap->state == AUTOPILOT_FAILED) {
-        return 0.0f;
+    // Return current pose if not active
+    if (ap->state != AUTOPILOT_EXECUTING) {
+        return ap->current_pose;
     }
 
-    // Handle smooth heading correction phase
-    if (ap->state == AUTOPILOT_CORRECTING) {
-        ap->correction_elapsed += dt;
-        float t = ap->correction_elapsed / ap->correction_duration;
-
-        if (t >= 1.0f) {
-            // Correction complete - set final heading exactly
-            ap->heading_nudge_pending = true;
-            ap->heading_nudge_target = ap->start_heading;
-            ap->state = AUTOPILOT_FINISHED;
-            *out_complete = true;
-            printf("[Autopilot] Heading correction complete (%.1f° -> %.1f°)\n",
-                   ap->correction_start_heading * 180.0f / 3.14159f,
-                   ap->start_heading * 180.0f / 3.14159f);
-            fflush(stdout);
-            return 0.0f;
-        }
-
-        // Smooth interpolation using ease-out curve: 1 - (1-t)^2
-        float ease_t = 1.0f - (1.0f - t) * (1.0f - t);
-
-        // Interpolate heading
-        float target_heading = ap->correction_start_heading +
-                               (ap->start_heading - ap->correction_start_heading) * ease_t;
-
-        // Debug: print progress at 50%
-        static bool printed_50 = false;
-        if (t > 0.5f && !printed_50) {
-            printf("[Autopilot] Correction animating: %.0f%% (heading=%.1f°)\n",
-                   t * 100.0f, target_heading * 180.0f / 3.14159f);
-            fflush(stdout);
-            printed_50 = true;
-        }
-        if (t < 0.1f) {
-            printed_50 = false;  // Reset for next correction
-        }
-
-        // Request this frame's heading adjustment
-        ap->heading_nudge_pending = true;
-        ap->heading_nudge_target = target_heading;
-
-        return 0.0f;  // No steering during correction
-    }
-
+    // Update timing
     ap->elapsed += dt;
+    ap->progress = ap->elapsed / ap->duration;
 
-    // Calculate current displacement from start
-    float dx = current_pos.x - ap->start_position.x;
-    float dz = current_pos.z - ap->start_position.z;
+    // Clamp progress
+    if (ap->progress >= 1.0f) {
+        ap->progress = 1.0f;
+    }
 
-    // Project onto forward/lateral directions
+    // Apply easing curve for smoother motion
+    float t = ease_in_out(ap->progress);
+
+    // Interpolate position and heading
+    ap->current_pose.position = vec3_lerp(ap->start_position, ap->target_position, t);
+    ap->current_pose.heading = angle_lerp(ap->start_heading, ap->target_heading, t);
+
+    // Add realistic heading wobble for drift maneuvers
+    // Car's nose dips into the drift direction, then straightens out
+    if (ap->request.type == MANEUVER_DRIFT || ap->request.type == MANEUVER_STEEP_DRIFT) {
+        // Sine wave peaks at 50% progress, returns to 0 at 100%
+        // This creates a smooth "nose-in, straighten-out" motion
+        float wobble_amount = 8.0f * (PI / 180.0f);  // 8 degrees max
+        float wobble = sinf(ap->progress * PI) * wobble_amount;
+        // Direction: negative wobble for left drift, positive for right
+        wobble *= (float)ap->request.direction;  // -1 for left, +1 for right
+        ap->current_pose.heading += wobble;
+    }
+
+    // Calculate displacement for debug
+    float dx = ap->current_pose.position.x - ap->start_position.x;
+    float dz = ap->current_pose.position.z - ap->start_position.z;
     float sin_h = sinf(ap->start_heading);
     float cos_h = cosf(ap->start_heading);
-
     ap->forward_displacement = dx * sin_h + dz * cos_h;
     ap->lateral_displacement = dx * cos_h - dz * sin_h;
 
-    // Target lateral displacement (signed)
-    float target_lateral = 0.0f;
-    float target_lateral_unsigned = 0.0f;
-    switch (ap->request.type) {
-        case MANEUVER_DRIFT:
-            target_lateral_unsigned = CW_QUARTER_INCH;
-            break;
-        case MANEUVER_STEEP_DRIFT:
-            target_lateral_unsigned = CW_HALF_INCH;
-            break;
-        default:
-            target_lateral_unsigned = CW_QUARTER_INCH;
-            break;
-    }
-    target_lateral = target_lateral_unsigned * (float)ap->request.direction;
-
-    // Simple steering profile for drift:
-    // Phase 1: Steer in direction to initiate lateral movement
-    // Phase 2: Counter-steer to stop lateral movement and maintain heading
-
-    const SteeringProfile* profile = &s_drift_profile;
-    if (ap->request.type == MANEUVER_STEEP_DRIFT) {
-        profile = &s_steep_drift_profile;
-    }
-
-    float steer = 0.0f;
-    // Invert direction for physics steering convention
-    // Testing showed: MANEUVER_LEFT(-1) with negative steer caused car to go RIGHT
-    // So we invert: LEFT drift needs positive steer, RIGHT drift needs negative steer
-    float dir = -(float)ap->request.direction;
-
-    float progress = ap->elapsed / ap->expected_duration;
-
-    // Phase boundaries (tuned for balance)
-    // Test 7: 45%/90%, full duration -> 2.14m (overdrift by 2x!), -9.2° heading
-    // Problem: too much lateral. Reduce phase1 to 30%, keep counter-steer
-    const float PHASE1_END = 0.30f;  // Steer phase: 0-30%
-    const float PHASE2_END = 0.85f;  // Counter-steer phase: 30-85%
-
-    if (progress < PHASE1_END) {
-        // Phase 1: Steer to initiate drift
-        // Use full intensity at start, taper off
-        float phase_progress = progress / PHASE1_END;
-        steer = dir * profile->steer_intensity * (1.0f - phase_progress * 0.5f);
-    } else if (progress < PHASE2_END) {
-        // Phase 2: Counter-steer to straighten heading
-        float phase_progress = (progress - PHASE1_END) / (PHASE2_END - PHASE1_END);
-        steer = -dir * profile->return_intensity * (1.0f - phase_progress * 0.5f);
-
-        // At start of Phase 2 (just crossed PHASE1_END), request lateral correction
-        if (!ap->phase1_complete) {
-            ap->phase1_complete = true;
-            // Calculate how much lateral correction is needed
-            float lateral_error = target_lateral - ap->lateral_displacement;
-            if (fabsf(lateral_error) > 0.05f) {  // Only nudge if > 5cm off
-                ap->lateral_nudge_pending = true;
-                ap->lateral_nudge_amount = lateral_error;
-                printf("[Autopilot] Phase 1 complete: lateral=%.2fm, target=%.2fm, nudge=%.2fm\n",
-                       ap->lateral_displacement, target_lateral, lateral_error);
-            }
-        }
-    } else {
-        // Phase 3: Center steering, let physics settle
-        steer = 0.0f;
-    }
-
-    ap->steer_intensity = steer;
-
-    // ========== PERIODIC PROGRESS OUTPUT ==========
-    // Print every 25% progress
-    float progress_pct = progress * 100.0f;
-    if ((int)(progress_pct / 25.0f) > (int)(s_last_progress_print / 25.0f) || s_last_progress_print < 0) {
-        printf("[Autopilot] t=%.2fs (%.0f%%) | steer=%.2f | lat=%.2fm | fwd=%.2fm | heading=%.1f°\n",
-               ap->elapsed, progress_pct, steer,
-               ap->lateral_displacement, ap->forward_displacement,
-               current_heading * 180.0f / 3.14159f);
+    // Debug output at 25% intervals
+    static int last_quarter = -1;
+    int quarter = (int)(ap->progress * 4.0f);
+    if (quarter != last_quarter && quarter <= 4) {
+        printf("[Kinematic] %.0f%% | pos=(%.1f, %.1f) | heading=%.1f° | lat=%.2fm\n",
+               ap->progress * 100.0f,
+               ap->current_pose.position.x, ap->current_pose.position.z,
+               ap->current_pose.heading * 180.0f / PI,
+               ap->lateral_displacement);
         fflush(stdout);
-        s_last_progress_print = progress_pct;
+        last_quarter = quarter;
     }
 
-    // Check timeout
-    if (ap->elapsed > ap->timeout) {
-        printf("\n");
-        printf("╔══════════════════════════════════════════════════════════════╗\n");
-        printf("║               MANEUVER AUTOPILOT TIMEOUT                     ║\n");
-        printf("╠══════════════════════════════════════════════════════════════╣\n");
-        printf("║ Elapsed: %.2fs (timeout: %.2fs)                             \n",
-               ap->elapsed, ap->timeout);
-        printf("║ Final lateral:  %.2fm (target: %.2fm)                       \n",
-               ap->lateral_displacement, target_lateral);
-        printf("║ Final forward:  %.2fm                                       \n",
-               ap->forward_displacement);
-        printf("╚══════════════════════════════════════════════════════════════╝\n");
-        fflush(stdout);
-        ap->state = AUTOPILOT_FAILED;
+    // Check completion
+    if (ap->progress >= 1.0f) {
+        ap->state = AUTOPILOT_FINISHED;
         *out_complete = true;
-        s_last_progress_print = -1.0f;
-        return 0.0f;
-    }
+        last_quarter = -1;  // Reset for next maneuver
 
-    // Check completion: only when full duration elapsed
-    // Don't complete early - let all steering phases run so heading recovers
-    if (progress >= 1.0f) {
-
-        // Calculate accuracy - how close to target (100% = perfect, 0% = no movement or way off)
-        float lateral_error = fabsf(fabsf(ap->lateral_displacement) - target_lateral_unsigned);
-        float accuracy = 100.0f * fmaxf(0.0f, 1.0f - lateral_error / target_lateral_unsigned);
+        // Final position exactly at target
+        ap->current_pose.position = ap->target_position;
+        ap->current_pose.heading = ap->target_heading;
 
         printf("\n");
         printf("╔══════════════════════════════════════════════════════════════╗\n");
-        printf("║               MANEUVER AUTOPILOT COMPLETE                    ║\n");
+        printf("║            KINEMATIC MANEUVER COMPLETE                       ║\n");
         printf("╠══════════════════════════════════════════════════════════════╣\n");
         printf("║ Duration: %.2fs                                             \n",
                ap->elapsed);
-        printf("╠══════════════════════════════════════════════════════════════╣\n");
-        printf("║ END STATE:                                                   ║\n");
-        printf("║   Position: (%.2f, %.2f, %.2f)                            \n",
-               current_pos.x, current_pos.y, current_pos.z);
-        printf("║   Heading:  %.1f° (start: %.1f°, delta: %.1f°)              \n",
-               current_heading * 180.0f / 3.14159f,
-               ap->start_heading * 180.0f / 3.14159f,
-               (current_heading - ap->start_heading) * 180.0f / 3.14159f);
-        printf("╠══════════════════════════════════════════════════════════════╣\n");
-        printf("║ DISPLACEMENT:                                                ║\n");
-        printf("║   Lateral:  %.2fm (target: %.2fm) = %.0f%% accuracy        \n",
-               ap->lateral_displacement, target_lateral, accuracy);
-        printf("║   Forward:  %.2fm                                           \n",
-               ap->forward_displacement);
-        printf("╠══════════════════════════════════════════════════════════════╣\n");
-
-        // Evaluate based on both lateral AND heading recovery
-        // Heading recovery is priority - drift should end pointing straight
-        float heading_delta = fabsf(current_heading - ap->start_heading) * 180.0f / 3.14159f;
-        bool heading_ok = heading_delta < 10.0f;  // Within 10 degrees
-        bool lateral_ok = accuracy > 60.0f;       // At least 60% of target
-
-        if (heading_ok && lateral_ok) {
-            printf("║   STATUS: ✓ GOOD - drift complete, heading recovered        ║\n");
-        } else if (!heading_ok) {
-            printf("║   STATUS: ✗ HEADING - car still turned %.0f° (need <10°)     \n", heading_delta);
-        } else {
-            printf("║   STATUS: ~ LATERAL - only %.0f%% of target drift            \n", accuracy);
-        }
+        printf("║ Final: pos=(%.1f, %.1f, %.1f) heading=%.1f°                \n",
+               ap->current_pose.position.x, ap->current_pose.position.y,
+               ap->current_pose.position.z,
+               ap->current_pose.heading * 180.0f / PI);
+        printf("║ Lateral: %.2fm | Forward: %.2fm                            \n",
+               ap->lateral_displacement, ap->forward_displacement);
         printf("╚══════════════════════════════════════════════════════════════╝\n");
         fflush(stdout);
-
-        // Check if heading correction is needed (> 2 degrees off)
-        float heading_error = current_heading - ap->start_heading;
-        if (fabsf(heading_error) > 0.035f) {  // ~2 degrees
-            // Store correction for post-maneuver animation (happens when unpaused)
-            ap->state = AUTOPILOT_CORRECTING;  // Mark that correction is pending
-            ap->correction_elapsed = 0.0f;
-            ap->correction_duration = 0.25f;  // 0.25 seconds for smooth animation
-            ap->correction_start_heading = current_heading;
-            printf("[Autopilot] Heading correction queued: %.1f° -> %.1f° (will animate on unpause)\n",
-                   current_heading * 180.0f / 3.14159f,
-                   ap->start_heading * 180.0f / 3.14159f);
-        } else {
-            ap->state = AUTOPILOT_FINISHED;
-        }
-
-        // Signal complete - physics will pause, correction runs on next unpause
-        *out_complete = true;
-        s_last_progress_print = -1.0f;
-        return 0.0f;
     }
 
-    return steer;
+    return ap->current_pose;
 }
 
 void maneuver_cancel(ManeuverAutopilot* ap) {
@@ -548,12 +373,21 @@ void maneuver_cancel(ManeuverAutopilot* ap) {
         printf("[Maneuver] Cancelled after %.2fs\n", ap->elapsed);
     }
     ap->state = AUTOPILOT_IDLE;
-    ap->steer_intensity = 0.0f;
 }
 
 bool maneuver_is_active(const ManeuverAutopilot* ap) {
-    return ap->state == AUTOPILOT_STARTING ||
-           ap->state == AUTOPILOT_EXECUTING ||
-           ap->state == AUTOPILOT_COMPLETING ||
-           ap->state == AUTOPILOT_CORRECTING;
+    return ap->state == AUTOPILOT_EXECUTING;
+}
+
+Vec3 maneuver_get_exit_velocity(const ManeuverAutopilot* ap) {
+    // Calculate velocity in the direction of target heading at original speed
+    float sin_h = sinf(ap->target_heading);
+    float cos_h = cosf(ap->target_heading);
+
+    Vec3 velocity;
+    velocity.x = sin_h * ap->start_speed_ms;
+    velocity.y = 0.0f;
+    velocity.z = cos_h * ap->start_speed_ms;
+
+    return velocity;
 }

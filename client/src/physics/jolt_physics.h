@@ -218,10 +218,19 @@ bool physics_vehicle_maneuver_active(PhysicsWorld* pw, int vehicle_id);
 // Get autopilot state for display
 const ManeuverAutopilot* physics_vehicle_get_autopilot(PhysicsWorld* pw, int vehicle_id);
 
-// Position/heading correction for maneuvers
-// Nudge position laterally (perpendicular to current heading)
+// Kinematic animation for maneuvers
+// Set vehicle to kinematic mode (ignores physics forces, can be positioned directly)
+void physics_vehicle_set_kinematic(PhysicsWorld* pw, int vehicle_id, bool kinematic);
+// Check if vehicle is in kinematic mode
+bool physics_vehicle_is_kinematic(PhysicsWorld* pw, int vehicle_id);
+// Move kinematic body to target position/rotation (smooth, handles collisions)
+void physics_vehicle_move_kinematic(PhysicsWorld* pw, int vehicle_id,
+                                    Vec3 target_pos, float target_heading, float dt);
+// Set velocity directly (for exit from kinematic mode)
+void physics_vehicle_set_velocity(PhysicsWorld* pw, int vehicle_id, Vec3 velocity);
+
+// Legacy position/heading correction (kept for compatibility)
 void physics_vehicle_nudge_lateral(PhysicsWorld* pw, int vehicle_id, float offset_meters);
-// Set exact heading (Y rotation in radians), preserving position and velocity
 void physics_vehicle_set_heading(PhysicsWorld* pw, int vehicle_id, float heading_radians);
 
 // Debug visualization - call between line_renderer_begin/end
