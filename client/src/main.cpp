@@ -605,44 +605,47 @@ int main(int argc, char* argv[]) {
             platform_capture_mouse(&platform, &input, false);
         }
 
-        // Number keys 1-0 select vehicles by physics index
-        // Shift+number also enables chase camera
+        // Shift+number keys select vehicles and enable chase camera
+        // Without Shift, number keys do nothing (1-4 are maneuvers when paused)
         {
-            int key_to_vehicle[10] = {KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8, KEY_9, KEY_0};
             bool shift_held = input.keys[KEY_LSHIFT] || input.keys[KEY_RSHIFT];
 
-            for (int v = 0; v < 10; v++) {
-                if (input.keys_pressed[key_to_vehicle[v]]) {
-                    // Find entity that maps to physics vehicle v
-                    int target_phys_id = v;
-                    if (target_phys_id < physics.vehicle_count && physics.vehicles[target_phys_id].active) {
-                        // Find the entity with this physics id
-                        for (int i = 0; i < entities.count; i++) {
-                            Entity* e = &entities.entities[i];
-                            if (e->active && e->id < MAX_ENTITIES && entity_to_physics[e->id] == target_phys_id) {
-                                entity_manager_select(&entities, e->id);
-                                printf("Selected vehicle %d\n", v + 1);
+            if (shift_held) {
+                int key_to_vehicle[10] = {KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8, KEY_9, KEY_0};
 
-                                // Shift+number also enables chase camera
-                                if (shift_held && !chase_camera) {
-                                    chase_camera = true;
-                                    // Initialize chase camera from current position
-                                    Vec3 car_pos;
-                                    physics_vehicle_get_position(&physics, target_phys_id, &car_pos);
-                                    Vec3 offset = vec3_sub(camera.position, car_pos);
-                                    chase_distance = 10.0f;
-                                    chase_azimuth = atan2f(offset.x, offset.z);
-                                    float horiz_dist = sqrtf(offset.x * offset.x + offset.z * offset.z);
-                                    chase_elevation = atan2f(offset.y, horiz_dist);
-                                    if (chase_elevation < 0.175f) chase_elevation = 0.175f;
-                                    if (chase_elevation > 1.22f) chase_elevation = 1.22f;
-                                    printf("Chase camera ON\n");
+                for (int v = 0; v < 10; v++) {
+                    if (input.keys_pressed[key_to_vehicle[v]]) {
+                        // Find entity that maps to physics vehicle v
+                        int target_phys_id = v;
+                        if (target_phys_id < physics.vehicle_count && physics.vehicles[target_phys_id].active) {
+                            // Find the entity with this physics id
+                            for (int i = 0; i < entities.count; i++) {
+                                Entity* e = &entities.entities[i];
+                                if (e->active && e->id < MAX_ENTITIES && entity_to_physics[e->id] == target_phys_id) {
+                                    entity_manager_select(&entities, e->id);
+                                    printf("Selected vehicle %d\n", v + 1);
+
+                                    // Also enable chase camera
+                                    if (!chase_camera) {
+                                        chase_camera = true;
+                                        // Initialize chase camera from current position
+                                        Vec3 car_pos;
+                                        physics_vehicle_get_position(&physics, target_phys_id, &car_pos);
+                                        Vec3 offset = vec3_sub(camera.position, car_pos);
+                                        chase_distance = 10.0f;
+                                        chase_azimuth = atan2f(offset.x, offset.z);
+                                        float horiz_dist = sqrtf(offset.x * offset.x + offset.z * offset.z);
+                                        chase_elevation = atan2f(offset.y, horiz_dist);
+                                        if (chase_elevation < 0.175f) chase_elevation = 0.175f;
+                                        if (chase_elevation > 1.22f) chase_elevation = 1.22f;
+                                        printf("Chase camera ON\n");
+                                    }
+                                    break;
                                 }
-                                break;
                             }
                         }
+                        break;
                     }
-                    break;
                 }
             }
         }
@@ -1443,9 +1446,9 @@ int main(int argc, char* argv[]) {
 
         // Help overlay (renders on top of everything)
         if (show_help) {
-            // Semi-transparent background panel - upper left, more transparent
+            // Semi-transparent background panel - upper left, auto-height
             float help_w = 320.0f;
-            float help_h = 560.0f;
+            float help_h = platform.height - 30.0f;  // Full window height minus margins
             float help_x = 15.0f;
             float help_y = 15.0f;
 
@@ -1487,9 +1490,16 @@ int main(int argc, char* argv[]) {
                 ty += line_h;
                 text_draw(&text_renderer, "  LMB       Click select", tx, ty, UI_COLOR_WHITE);
                 ty += line_h;
-                text_draw(&text_renderer, "  1-0       Select car 1-10", tx, ty, UI_COLOR_WHITE);
-                ty += line_h;
                 text_draw(&text_renderer, "  Shift+num Select + chase", tx, ty, UI_COLOR_WHITE);
+                ty += line_h * 1.3f;
+
+                text_draw(&text_renderer, "MANEUVERS (paused)", tx, ty, UI_COLOR_CAUTION);
+                ty += line_h;
+                text_draw(&text_renderer, "  TAB       Pause/Unpause", tx, ty, UI_COLOR_WHITE);
+                ty += line_h;
+                text_draw(&text_renderer, "  1/2       Drift L/R", tx, ty, UI_COLOR_WHITE);
+                ty += line_h;
+                text_draw(&text_renderer, "  3/4       Steep Drift L/R", tx, ty, UI_COLOR_WHITE);
                 ty += line_h * 1.3f;
 
                 text_draw(&text_renderer, "GAMEPLAY", tx, ty, UI_COLOR_CAUTION);
