@@ -1,6 +1,6 @@
 # Arena Combat Engine
 
-A learning project exploring 3D game engine development in C with OpenGL.
+A 3D turn-based vehicular combat engine inspired by classic tabletop games.
 
 ## Project Status
 
@@ -8,32 +8,46 @@ A learning project exploring 3D game engine development in C with OpenGL.
 
 ## What This Is
 
-- A personal learning project for 3D graphics programming
-- An exploration of game engine architecture in C
-- A prototype/proof-of-concept, not a commercial product
-- Built from scratch using SDL2, OpenGL, and GLEW
+- A turn-based vehicular combat game where you plan your moves, then watch physics execute them
+- Faithful to tabletop mechanics: simultaneous planning, phased movement, handling rolls
+- Physics replaces rulers and turning keys - you pick a maneuver, the engine drives the arc
+- Built in C++ with SDL2, OpenGL, and Jolt Physics
 
 ## What This Is NOT
 
+- A real-time arcade game (not Twisted Metal)
+- A racing simulator
 - A commercial product
-- An official game or licensed adaptation
-- Ready for production use
 
 ## Current Features
 
-- SDL2 window with OpenGL 3.3+ context
+### Turn-Based System
+- Pause to plan, unpause to execute
+- Multi-phase turns (1-5 phases based on speed, per tabletop rules)
+- Ghost path preview shows planned movement before execution
+- Speed changes during turns (accelerate/brake)
+
+### Maneuvers (Implemented)
+- **STRAIGHT** (D0) - Forward movement
+- **DRIFT** (D1) - 1/4" lateral shift, maintain heading
+- **STEEP DRIFT** (D3) - 1/2" lateral shift
+- **BEND** (D1-D6) - Arc turns: 15°, 30°, 45°, 60°, 75°, 90°
+
+### Physics
+- Jolt Physics engine for vehicle dynamics
+- Kinematic animation for predictable maneuver execution
+- Wheeled vehicle simulation with suspension
+- Collision detection with arena walls and obstacles
+
+### Rendering
+- SDL2 window with OpenGL 4.x context
 - Chase camera with smooth follow and mouse orbit
-- Procedural floor grid with distance fog
-- Box renderer with directional lighting
-- Arena walls and obstacles
-- ODE physics engine integration with:
-  - Rigid body vehicle dynamics
-  - Per-axle suspension (configurable ERP/CFM)
-  - Friction and slip simulation
-  - Collision detection
-- JSON-based vehicle and scene configuration
-- Ghost path preview for planned maneuvers
+- Arena with walls and obstacles
 - Debug visualization for physics bodies
+
+## Screenshots
+
+![Arena gameplay](docs/images/screenshot1.png)
 
 ## Building
 
@@ -43,10 +57,12 @@ Install dependencies:
 
 ```bash
 sudo apt update
-sudo apt install build-essential cmake libsdl2-dev libglew-dev libode-dev
+sudo apt install build-essential cmake libsdl2-dev libglew-dev
 ```
 
-Build and run (OS-aware scripts handle WSL2/Linux/Windows):
+Jolt Physics is fetched automatically by CMake.
+
+Build and run:
 
 ```bash
 cd client
@@ -55,103 +71,77 @@ cd client
 ./run.sh --build  # Build and run in one step
 ```
 
-### Windows (MSYS2 / MinGW64)
-
-1. Install [MSYS2](https://www.msys2.org/)
-
-2. Open **MINGW64** terminal (not MSYS2 or UCRT) and install dependencies:
-
-```bash
-pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake mingw-w64-x86_64-SDL2 mingw-w64-x86_64-glew mingw-w64-x86_64-ode git
-```
-
-3. Fix ODE library naming issue (MSYS2 package bug):
-
-```bash
-ln -s /mingw64/lib/libode_double.dll.a /mingw64/lib/libode.dll.a
-```
-
-4. Clone and build:
-
-```bash
-git clone git@github.com:your-username/arena-combat-engine.git
-cd arena-combat-engine/client
-./build.sh        # Build (detects MinGW)
-./run.sh          # Run
-./run.sh --build  # Build and run
-```
-
 ## Controls
 
-### Driving Mode (Default)
+### Turn-Based Mode (Default)
+
+- **Tab**: Pause/unpause physics (pause to plan, unpause to execute)
+- **Left/Right**: Select phase (when paused)
+- **Up/Down**: Cycle maneuvers for selected phase
+- **Shift + Left/Right**: Change maneuver direction
+- **Space**: Execute turn (when paused)
+
+### Freestyle Mode
 
 - **W/S**: Accelerate / Brake
 - **A/D**: Steer left / right
-- **Right-click + drag**: Orbit camera around vehicle
+- **V**: Toggle cruise control
+- **[/]**: Cruise speed down/up (snap to 10 mph increments)
+
+### Camera
+
+- **C**: Toggle chase camera (follows selected vehicle)
+- **Right-click + drag**: Orbit camera
 - **Scroll**: Zoom in / out
-
-### Fly Camera Mode
-
-- **Right-click + drag**: Look around
-- **WASD**: Move
-- **E/Space**: Move up
-- **Q/Ctrl**: Move down
-- **Shift**: Move faster
-- **Scroll**: Adjust speed
 
 ### General
 
-- **Tab**: Toggle between driving and fly camera modes
+- **F**: Toggle between Turn-Based and Freestyle modes
 - **G**: Toggle ghost path preview
 - **P**: Toggle physics debug visualization
-- **F11**: Toggle fullscreen
+- **H**: Toggle vehicle visibility
+- **R**: Reload vehicle config
 - **ESC**: Quit
 
 ## Project Structure
 
 ```
-assets/                 # Shared game assets
-  config/               # JSON vehicle and scene configs
-    vehicles/           # Vehicle definitions
-    scenes/             # Scene/arena definitions
-  fonts/                # TTF fonts
-  models/               # 3D models (OBJ)
-  shaders/              # GLSL shaders
-  textures/             # Texture images
-  audio/                # Sound effects and music
-
-client/                 # Game client (C/OpenGL)
+client/                 # Game client (C++/OpenGL)
   src/
-    platform/           # SDL2 window/input handling
-    math/               # Vector and matrix math
+    game/               # Maneuvers, handling, config loaders
+    physics/            # Jolt Physics integration
     render/             # Shaders, camera, mesh rendering
-    physics/            # ODE physics integration
-    game/               # Entity system, config loader
-    ui/                 # UI rendering and text
-    vendor/             # Third-party code (cJSON)
+    ui/                 # UI panels and text
+    platform/           # SDL2 window/input
+    math/               # Vector and matrix math
 
-server/                 # Game server (Go)
-  cmd/server/           # Server entry point
-  internal/
-    net/                # Client connections, messaging
-    lobby/              # Room management, matchmaking
-    game/               # Game state, turn logic
+assets/                 # Game assets
+  data/
+    vehicles/           # Vehicle JSON configs
+    equipment/          # Suspension, tires, power plants
+  config/scenes/        # Arena definitions
+  shaders/              # GLSL shaders
 
-docs/                   # Design documents and guides
+server/                 # Game server (Go) - planned
+docs/                   # Design documents
 ```
 
-## Configuration
+## Documentation
 
-Vehicle and scene parameters are defined in JSON files under `assets/config/`. See [CONFIG_GUIDE.md](docs/CONFIG_GUIDE.md) for detailed documentation on all configuration options including suspension tuning (ERP/CFM).
+- [ROADMAP.md](docs/ROADMAP.md) - Development status and planned features
+- [CONFIG_GUIDE.md](docs/CONFIG_GUIDE.md) - Vehicle and physics configuration
+- [MANEUVERS.md](docs/MANEUVERS.md) - Maneuver system details
 
 ## License
 
 See [LICENSE](LICENSE) for details.
 
-## Third-Party Assets
-
-- Vehicle models pending (placeholder rendering currently used)
-
 ## Disclaimer
 
-This project references and is inspired by classic tabletop games for educational purposes. All trademarks belong to their respective owners. This is a fan learning project with no commercial intent at this stage.
+This is an independent fan project created for educational and personal use. It is not affiliated with, endorsed by, sponsored by, or in any way officially connected with Steve Jackson Games, the Car Wars franchise, or any of their subsidiaries or affiliates.
+
+Car Wars, AADA, Autoduel, and Uncle Albert's are trademarks of Steve Jackson Games Incorporated. All other trademarks are the property of their respective owners.
+
+The use of any trade name or trademark is for identification and reference purposes only and does not imply any association with the trademark holder.
+
+This project is provided "as is" without warranty of any kind. The author makes no representations regarding the accuracy, completeness, or suitability of this software for any purpose.
