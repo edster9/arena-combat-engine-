@@ -206,6 +206,7 @@ bool physics_init(PhysicsWorld* pw)
     pw->vehicle_count = 0;
     pw->step_size = 1.0f / 60.0f;
     pw->accumulator = 0.0f;
+    pw->paused = false;  // Start unpaused so vehicles can settle
 
     for (int i = 0; i < MAX_PHYSICS_VEHICLES; i++)
     {
