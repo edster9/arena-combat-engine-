@@ -237,6 +237,24 @@ typedef struct {
     PhysicsModeOverrides overrides;
 } PhysicsMode;
 
+// Friction curve point (slip_ratio, friction_multiplier)
+typedef struct {
+    float slip;
+    float friction;
+} FrictionPoint;
+
+#define MAX_FRICTION_POINTS 8
+
+// Friction curve configuration (loaded from physics.json)
+typedef struct {
+    char name[MAX_NAME_LENGTH];
+    FrictionPoint longitudinal[MAX_FRICTION_POINTS];
+    int longitudinal_count;
+    FrictionPoint lateral[MAX_FRICTION_POINTS];
+    int lateral_count;
+    float lateral_rails_multiplier;
+} FrictionCurve;
+
 // Load vehicle configuration from JSON file
 // Returns true on success, false on error (uses defaults on error)
 bool config_load_vehicle(const char* filepath, VehicleJSON* out);
@@ -267,5 +285,12 @@ void config_apply_physics_mode(VehicleJSON* vehicle, const PhysicsMode* mode);
 
 // Check if we're in strict tabletop mode
 bool config_is_strict_mode(void);
+
+// Load friction curve configuration from physics.json
+// Returns true on success, false on error (uses generous curve as default)
+bool config_load_friction_curve(const char* filepath, FrictionCurve* out);
+
+// Get the currently active friction curve
+const FrictionCurve* config_get_friction_curve(void);
 
 #endif // CONFIG_LOADER_H

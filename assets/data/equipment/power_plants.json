@@ -1,85 +1,116 @@
 {
   "_meta": {
     "description": "Power plants - electric and gas engines",
-    "source": "Based on tabletop Compendium 2nd Edition, converted to SI units",
+    "source": "Based on tabletop Compendium 2nd Edition, converted to realistic engine specs",
     "units": {
       "cost": "dollars",
       "weight": "lbs",
       "spaces": "vehicle spaces",
-      "force_n": "maximum motor force in Newtons (wheel force after drivetrain)"
+      "horsepower": "peak engine power in HP",
+      "torque_nm": "peak engine torque in Newton-meters",
+      "peak_power_rpm": "RPM at which peak HP is achieved",
+      "peak_torque_rpm": "RPM at which peak torque is achieved",
+      "redline_rpm": "maximum safe engine RPM"
     },
     "physics_notes": {
-      "force_n": "Direct Newton value for Jolt physics - no conversion needed",
-      "acceleration": "a = F/m, so 6250N / 862kg = 7.25 m/s² = 16 mph/s",
-      "weight_to_mass": "lbs * 0.453592 = kg"
+      "wheel_force": "Calculated: (torque × gear_ratio × diff_ratio) / wheel_radius",
+      "hp_torque_relation": "HP = Torque(Nm) × RPM / 9549",
+      "weight_to_mass": "lbs × 0.453592 = kg"
     }
   },
   "electric": {
     "small": {
       "id": "electric_small",
-      "name": "Small Power Plant",
+      "name": "Small Electric Motor",
       "type": "electric",
       "cost": 500,
       "weight": 500,
       "spaces": 3,
       "dp": 5,
-      "force_n": 2000,
-      "power_units": 400
+      "horsepower": 60,
+      "torque_nm": 150,
+      "peak_power_rpm": 8000,
+      "peak_torque_rpm": 0,
+      "redline_rpm": 12000,
+      "power_units": 400,
+      "notes": "Electric motors have instant torque from 0 RPM"
     },
     "medium": {
       "id": "electric_medium",
-      "name": "Medium Power Plant",
+      "name": "Medium Electric Motor",
       "type": "electric",
       "cost": 1000,
       "weight": 700,
       "spaces": 4,
       "dp": 8,
-      "force_n": 3500,
+      "horsepower": 100,
+      "torque_nm": 250,
+      "peak_power_rpm": 8000,
+      "peak_torque_rpm": 0,
+      "redline_rpm": 12000,
       "power_units": 700
     },
     "large": {
       "id": "electric_large",
-      "name": "Large Power Plant",
+      "name": "Large Electric Motor",
       "type": "electric",
       "cost": 2000,
       "weight": 900,
       "spaces": 5,
       "dp": 10,
-      "force_n": 5000,
+      "horsepower": 150,
+      "torque_nm": 350,
+      "peak_power_rpm": 8000,
+      "peak_torque_rpm": 0,
+      "redline_rpm": 12000,
       "power_units": 1000
     },
     "super": {
       "id": "electric_super",
-      "name": "Super Power Plant",
+      "name": "Super Electric Motor",
       "type": "electric",
       "cost": 3000,
       "weight": 1100,
       "spaces": 6,
       "dp": 12,
-      "force_n": 6500,
+      "horsepower": 200,
+      "torque_nm": 450,
+      "peak_power_rpm": 8000,
+      "peak_torque_rpm": 0,
+      "redline_rpm": 12000,
       "power_units": 1300
     },
     "sport": {
       "id": "electric_sport",
-      "name": "Sport Power Plant",
+      "name": "Sport Electric Motor",
       "type": "electric",
       "cost": 6000,
       "weight": 1000,
       "spaces": 6,
       "dp": 12,
-      "force_n": 7500,
-      "power_units": 1500
+      "horsepower": 250,
+      "torque_nm": 500,
+      "peak_power_rpm": 9000,
+      "peak_torque_rpm": 0,
+      "redline_rpm": 14000,
+      "power_units": 1500,
+      "notes": "High-performance motor with extended RPM range"
     },
     "thundercat": {
       "id": "electric_thundercat",
-      "name": "Thundercat Power Plant",
+      "name": "Thundercat Dual Motor",
       "type": "electric",
       "cost": 12000,
       "weight": 2000,
       "spaces": 8,
       "dp": 15,
-      "force_n": 16750,
-      "power_units": 3350
+      "horsepower": 500,
+      "torque_nm": 900,
+      "peak_power_rpm": 9000,
+      "peak_torque_rpm": 0,
+      "redline_rpm": 15000,
+      "power_units": 3350,
+      "notes": "Dual motor setup, insane acceleration"
     },
     "nuclear": {
       "id": "nuclear_standard",
@@ -89,16 +120,14 @@
       "weight": 2500,
       "spaces": 14,
       "dp": 4,
-      "force_n": 50000,
+      "horsepower": 1500,
+      "torque_nm": 3000,
+      "peak_power_rpm": 5000,
+      "peak_torque_rpm": 0,
+      "redline_rpm": 8000,
       "max_top_speed": 200,
       "wheel_motor_upgrade_cost": 1000,
-      "notes": "Requires $1000 per wheel for motor upgrades. Special damage rules apply.",
-      "components": [
-        "reactor_core",
-        "heat_exchangers",
-        "generators",
-        "cooling_system"
-      ]
+      "notes": "Requires $1000 per wheel for motor upgrades. Special damage rules apply."
     },
     "nuclear_truck": {
       "id": "nuclear_truck",
@@ -108,206 +137,309 @@
       "weight": 6000,
       "spaces": 20,
       "dp": 6,
-      "force_n": 125000,
+      "horsepower": 3500,
+      "torque_nm": 8000,
+      "peak_power_rpm": 4000,
+      "peak_torque_rpm": 0,
+      "redline_rpm": 6000,
       "max_top_speed": 130,
-      "notes": "Better shielding than standard nuclear. Special damage rules apply."
+      "notes": "Massive torque for heavy hauling. Special damage rules apply."
     }
   },
   "cycle_electric": {
     "small_cycle": {
       "id": "electric_cycle_small",
-      "name": "Small Cycle Power Plant",
+      "name": "Small Cycle Motor",
       "type": "electric",
       "cost": 500,
       "weight": 100,
       "spaces": 1,
       "dp": 2,
-      "force_n": 1000
+      "horsepower": 30,
+      "torque_nm": 80,
+      "peak_power_rpm": 8000,
+      "peak_torque_rpm": 0,
+      "redline_rpm": 12000
     },
     "medium_cycle": {
       "id": "electric_cycle_medium",
-      "name": "Medium Cycle Power Plant",
+      "name": "Medium Cycle Motor",
       "type": "electric",
       "cost": 1000,
       "weight": 150,
       "spaces": 1,
       "dp": 3,
-      "force_n": 1500
+      "horsepower": 45,
+      "torque_nm": 120,
+      "peak_power_rpm": 8000,
+      "peak_torque_rpm": 0,
+      "redline_rpm": 12000
     },
     "large_cycle": {
       "id": "electric_cycle_large",
-      "name": "Large Cycle Power Plant",
+      "name": "Large Cycle Motor",
       "type": "electric",
       "cost": 1500,
       "weight": 175,
       "spaces": 2,
       "dp": 4,
-      "force_n": 2000
+      "horsepower": 60,
+      "torque_nm": 160,
+      "peak_power_rpm": 8000,
+      "peak_torque_rpm": 0,
+      "redline_rpm": 12000
     },
     "super_cycle": {
       "id": "electric_cycle_super",
-      "name": "Super Cycle Power Plant",
+      "name": "Super Cycle Motor",
       "type": "electric",
       "cost": 2000,
       "weight": 200,
       "spaces": 2,
       "dp": 5,
-      "force_n": 2500
+      "horsepower": 75,
+      "torque_nm": 200,
+      "peak_power_rpm": 8000,
+      "peak_torque_rpm": 0,
+      "redline_rpm": 12000
     },
     "super_trike": {
       "id": "electric_trike_super",
-      "name": "Super Trike Power Plant",
+      "name": "Super Trike Motor",
       "type": "electric",
       "cost": 3000,
       "weight": 250,
       "spaces": 3,
       "dp": 6,
-      "force_n": 3000
+      "horsepower": 90,
+      "torque_nm": 240,
+      "peak_power_rpm": 8000,
+      "peak_torque_rpm": 0,
+      "redline_rpm": 12000
     }
   },
   "gas_engines": {
     "10_cid": {
       "id": "gas_10cid",
-      "name": "10 cid Engine",
+      "name": "10 cid Engine (0.16L)",
       "type": "gas",
       "cost": 400,
       "weight": 60,
       "spaces": 1,
       "dp": 1,
-      "force_n": 750,
-      "mpg": 80
+      "horsepower": 15,
+      "torque_nm": 20,
+      "peak_power_rpm": 5500,
+      "peak_torque_rpm": 3500,
+      "redline_rpm": 6500,
+      "mpg": 80,
+      "notes": "Tiny engine for ultra-light vehicles"
     },
     "30_cid": {
       "id": "gas_30cid",
-      "name": "30 cid Engine",
+      "name": "30 cid Engine (0.5L)",
       "type": "gas",
       "cost": 750,
       "weight": 115,
       "spaces": 1,
       "dp": 2,
-      "force_n": 1250,
+      "horsepower": 35,
+      "torque_nm": 50,
+      "peak_power_rpm": 5500,
+      "peak_torque_rpm": 3500,
+      "redline_rpm": 6500,
       "mpg": 70
     },
     "50_cid": {
       "id": "gas_50cid",
-      "name": "50 cid Engine",
+      "name": "50 cid Engine (0.8L)",
       "type": "gas",
       "cost": 1250,
       "weight": 150,
       "spaces": 1,
       "dp": 3,
-      "force_n": 1750,
+      "horsepower": 55,
+      "torque_nm": 75,
+      "peak_power_rpm": 5500,
+      "peak_torque_rpm": 3500,
+      "redline_rpm": 6500,
       "mpg": 60
     },
     "100_cid": {
       "id": "gas_100cid",
-      "name": "100 cid Engine",
+      "name": "100 cid Engine (1.6L)",
       "type": "gas",
       "cost": 2500,
       "weight": 265,
       "spaces": 2,
       "dp": 6,
-      "force_n": 3250,
-      "mpg": 50
+      "horsepower": 110,
+      "torque_nm": 150,
+      "peak_power_rpm": 5800,
+      "peak_torque_rpm": 4000,
+      "redline_rpm": 7000,
+      "mpg": 50,
+      "notes": "Peppy 4-cylinder"
     },
     "150_cid": {
       "id": "gas_150cid",
-      "name": "150 cid Engine",
+      "name": "150 cid Engine (2.5L)",
       "type": "gas",
       "cost": 4000,
       "weight": 375,
       "spaces": 3,
       "dp": 9,
-      "force_n": 4750,
-      "mpg": 45
+      "horsepower": 165,
+      "torque_nm": 230,
+      "peak_power_rpm": 5800,
+      "peak_torque_rpm": 4000,
+      "redline_rpm": 7000,
+      "mpg": 45,
+      "notes": "Strong inline-4 or small V6"
     },
     "200_cid": {
       "id": "gas_200cid",
-      "name": "200 cid Engine",
+      "name": "200 cid Engine (3.3L)",
       "type": "gas",
       "cost": 5500,
       "weight": 480,
       "spaces": 4,
       "dp": 12,
-      "force_n": 6250,
-      "mpg": 35
+      "horsepower": 220,
+      "torque_nm": 310,
+      "peak_power_rpm": 6000,
+      "peak_torque_rpm": 4200,
+      "redline_rpm": 7000,
+      "mpg": 35,
+      "notes": "V6 or turbocharged 4-cylinder, good all-rounder"
     },
     "250_cid": {
       "id": "gas_250cid",
-      "name": "250 cid Engine",
+      "name": "250 cid Engine (4.1L)",
       "type": "gas",
       "cost": 6500,
       "weight": 715,
       "spaces": 5,
       "dp": 14,
-      "force_n": 8000,
-      "mpg": 28
+      "horsepower": 280,
+      "torque_nm": 400,
+      "peak_power_rpm": 6000,
+      "peak_torque_rpm": 4200,
+      "redline_rpm": 7000,
+      "mpg": 28,
+      "notes": "Small V8, muscle car territory"
     },
     "300_cid": {
       "id": "gas_300cid",
-      "name": "300 cid Engine",
+      "name": "300 cid Engine (4.9L)",
       "type": "gas",
       "cost": 7800,
       "weight": 825,
       "spaces": 6,
       "dp": 16,
-      "force_n": 10000,
-      "mpg": 22
+      "horsepower": 350,
+      "torque_nm": 500,
+      "peak_power_rpm": 6200,
+      "peak_torque_rpm": 4400,
+      "redline_rpm": 7200,
+      "mpg": 22,
+      "notes": "Classic V8"
     },
     "350_cid": {
       "id": "gas_350cid",
-      "name": "350 cid Engine",
+      "name": "350 cid Engine (5.7L)",
       "type": "gas",
       "cost": 9500,
       "weight": 975,
       "spaces": 7,
       "dp": 19,
-      "force_n": 12500,
-      "mpg": 18
+      "horsepower": 420,
+      "torque_nm": 580,
+      "peak_power_rpm": 6200,
+      "peak_torque_rpm": 4400,
+      "redline_rpm": 7200,
+      "mpg": 18,
+      "notes": "Legendary 350 small-block"
+    },
+    "350_cid_turbo": {
+      "id": "gas_350cid_turbo",
+      "name": "350 cid Turbo (5.7L)",
+      "type": "gas",
+      "cost": 14250,
+      "weight": 1000,
+      "spaces": 8,
+      "dp": 19,
+      "horsepower": 546,
+      "torque_nm": 725,
+      "peak_power_rpm": 6200,
+      "peak_torque_rpm": 4400,
+      "redline_rpm": 7200,
+      "mpg": 15,
+      "notes": "Twin-turbo 350 small-block, Corvette Z06 territory"
     },
     "400_cid": {
       "id": "gas_400cid",
-      "name": "400 cid Engine",
+      "name": "400 cid Engine (6.6L)",
       "type": "gas",
       "cost": 10500,
       "weight": 1050,
       "spaces": 8,
       "dp": 22,
-      "force_n": 15750,
-      "mpg": 15
+      "horsepower": 500,
+      "torque_nm": 680,
+      "peak_power_rpm": 6400,
+      "peak_torque_rpm": 4600,
+      "redline_rpm": 7500,
+      "mpg": 15,
+      "notes": "Big block power"
     },
     "450_cid": {
       "id": "gas_450cid",
-      "name": "450 cid Engine",
+      "name": "450 cid Engine (7.4L)",
       "type": "gas",
       "cost": 11700,
       "weight": 1125,
       "spaces": 9,
       "dp": 24,
-      "force_n": 19500,
-      "mpg": 13
+      "horsepower": 580,
+      "torque_nm": 780,
+      "peak_power_rpm": 6400,
+      "peak_torque_rpm": 4600,
+      "redline_rpm": 7500,
+      "mpg": 13,
+      "notes": "Serious drag racing potential"
     },
     "500_cid": {
       "id": "gas_500cid",
-      "name": "500 cid Engine",
+      "name": "500 cid Engine (8.2L)",
       "type": "gas",
       "cost": 13000,
       "weight": 1200,
       "spaces": 10,
       "dp": 26,
-      "force_n": 23750,
-      "mpg": 12
+      "horsepower": 650,
+      "torque_nm": 880,
+      "peak_power_rpm": 6500,
+      "peak_torque_rpm": 4800,
+      "redline_rpm": 7500,
+      "mpg": 12,
+      "notes": "Monster displacement"
     },
     "700_cid": {
       "id": "gas_700cid",
-      "name": "700 cid Engine",
+      "name": "700 cid Engine (11.5L)",
       "type": "gas",
       "cost": 19000,
       "weight": 1275,
       "spaces": 14,
       "dp": 30,
-      "force_n": 32500,
-      "mpg": 10
+      "horsepower": 900,
+      "torque_nm": 1200,
+      "peak_power_rpm": 6000,
+      "peak_torque_rpm": 4500,
+      "redline_rpm": 7000,
+      "mpg": 10,
+      "notes": "Extreme builds only, truck/race applications"
     }
   },
   "power_plant_accessories": {
@@ -316,24 +448,27 @@
       "name": "Platinum Catalysts (PCs)",
       "type": "electric_only",
       "cost_modifier": 0.2,
-      "force_modifier": 1.05,
-      "notes": "Increases force by 5%, costs 20% of plant cost"
+      "torque_modifier": 1.05,
+      "hp_modifier": 1.05,
+      "notes": "Increases power by 5%, costs 20% of plant cost"
     },
     "superconductors": {
       "id": "superconductors",
       "name": "Superconductors (SCs)",
       "type": "electric_only",
       "cost_modifier": 0.5,
-      "force_modifier": 1.10,
-      "notes": "Increases force by 10%, costs 50% of plant cost"
+      "torque_modifier": 1.10,
+      "hp_modifier": 1.10,
+      "notes": "Increases power by 10%, costs 50% of plant cost"
     },
     "pc_and_sc_combo": {
       "id": "pc_and_sc_combo",
       "name": "PCs and SCs Combined",
       "type": "electric_only",
       "cost_modifier": 0.7,
-      "force_modifier": 1.15,
-      "notes": "Combined effect: 15% force increase"
+      "torque_modifier": 1.15,
+      "hp_modifier": 1.15,
+      "notes": "Combined effect: 15% power increase"
     },
     "extra_power_cells": {
       "id": "extra_power_cells",
@@ -344,7 +479,7 @@
       "spaces_modifier": 0.1,
       "dp_modifier": 0.1,
       "power_units_modifier": 0.5,
-      "notes": "50% more power units, does not affect force"
+      "notes": "50% more power units, does not affect power output"
     },
     "improved_supercharger_capacitors": {
       "id": "isc",
@@ -354,7 +489,7 @@
       "weight": 75,
       "spaces": 1,
       "dp_bonus": 1,
-      "effect": "Adds 5 mph acceleration and 20 mph top speed for 3 turns",
+      "effect": "Temporary 50% power boost for 3 turns",
       "recharge_time": "2 minutes",
       "recharge_cost": 10
     },
@@ -389,34 +524,38 @@
       "name": "Turbocharger",
       "type": "gas_only",
       "cost_modifier": 0.5,
-      "force_modifier": 1.20,
+      "torque_modifier": 1.25,
+      "hp_modifier": 1.30,
       "weight": 0,
       "spaces": 1,
-      "notes": "Increases force by 20%"
+      "notes": "Significant power boost, 25% torque / 30% HP"
     },
     "supercharger": {
       "id": "supercharger",
       "name": "Supercharger",
       "type": "gas_only",
       "cost_modifier": 0.3,
-      "force_modifier": 1.10,
-      "notes": "Increases force by 10%"
+      "torque_modifier": 1.15,
+      "hp_modifier": 1.15,
+      "notes": "Linear power boost across RPM range"
     },
     "tubular_headers": {
       "id": "tubular_headers",
       "name": "Tubular Headers",
       "type": "gas_only",
       "cost_modifier": 0.2,
-      "force_modifier": 1.05,
-      "notes": "Increases force by 5%"
+      "torque_modifier": 1.05,
+      "hp_modifier": 1.08,
+      "notes": "Better exhaust flow, slight power bump"
     },
     "blueprinting": {
       "id": "blueprinting",
       "name": "Blueprinting",
       "type": "gas_only",
       "cost_modifier": 0.3,
-      "force_modifier": 1.05,
-      "notes": "Increases force by 5%"
+      "torque_modifier": 1.05,
+      "hp_modifier": 1.05,
+      "notes": "Precision machining for 5% more power"
     },
     "nitrous_oxide": {
       "id": "nitrous_oxide",
@@ -426,9 +565,9 @@
       "weight": 20,
       "spaces": 1,
       "duration": 5,
-      "acceleration_bonus": 5,
-      "top_speed_modifier": 0.5,
-      "notes": "5 second boost, uses 1 gallon of gas"
+      "torque_boost": 1.50,
+      "hp_boost": 1.50,
+      "notes": "5 second boost, 50% more power, uses 1 gallon of gas"
     },
     "hd_transmission": {
       "id": "hd_transmission",
@@ -436,7 +575,7 @@
       "cost": 1000,
       "weight": 100,
       "spaces": 0,
-      "notes": "Required for vehicles over 6000 lbs"
+      "notes": "Required for vehicles over 6000 lbs or 500+ HP"
     },
     "overdrive": {
       "id": "overdrive",
@@ -445,8 +584,7 @@
       "weight": 0,
       "spaces": 0,
       "top_speed_modifier": 0.2,
-      "acceleration_modifier": -0.5,
-      "notes": "Adds 20% to top speed, halves acceleration (min 2.5 mph)"
+      "notes": "Adds 20% to top speed via taller final gear"
     }
   }
 }

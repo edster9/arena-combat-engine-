@@ -1,6 +1,6 @@
 {
-  "name": "Gas Test Car",
-  "description": "Compact with 100 cid gas engine - target 10 mph/s (6s 0-60)",
+  "name": "Turbo Muscle Car",
+  "description": "Compact with twin-turbo 350 V8 - target sub-4s 0-60 (Corvette Z06 class)",
   "class": "wheeled",
 
   "chassis": {
@@ -8,35 +8,35 @@
     "modifier": "chassis_standard",
     "frame": "frame_standard",
     "length": 4.2,
-    "width": 1.8,
-    "height": 1.0
+    "width": 1.9,
+    "height": 0.9
   },
 
   "drivetrain": {
     "type": "single_motor",
-    "power_plant": "gas_200cid",
-    "gearbox": "gearbox_standard",
+    "power_plant": "gas_350cid_turbo",
+    "gearbox": "gearbox_performance",
     "driven_axles": ["front", "rear"]
   },
 
   "wheels": [
-    { "id": "FL", "position": [1.2, -0.5, 0.75], "tire": "front_tires" },
-    { "id": "FR", "position": [1.2, -0.5, -0.75], "tire": "front_tires" },
-    { "id": "RL", "position": [-1.2, -0.5, 0.75], "tire": "rear_tires" },
-    { "id": "RR", "position": [-1.2, -0.5, -0.75], "tire": "rear_tires" }
+    { "id": "FL", "position": [1.2, -0.45, 0.85], "tire": "front_tires" },
+    { "id": "FR", "position": [1.2, -0.45, -0.85], "tire": "front_tires" },
+    { "id": "RL", "position": [-1.2, -0.45, 0.85], "tire": "rear_tires" },
+    { "id": "RR", "position": [-1.2, -0.45, -0.85], "tire": "rear_tires" }
   ],
 
   "tires": [
     {
       "id": "front_tires",
       "type": "tire_standard",
-      "modifiers": ["mod_radial"],
+      "modifiers": ["mod_racing_slick"],
       "size": { "radius": 0.32, "width": 0.22 }
     },
     {
       "id": "rear_tires",
       "type": "tire_standard",
-      "modifiers": ["mod_radial"],
+      "modifiers": ["mod_racing_slick"],
       "size": { "radius": 0.32, "width": 0.22 }
     }
   ],

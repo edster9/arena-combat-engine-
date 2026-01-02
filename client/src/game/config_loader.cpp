@@ -690,25 +690,30 @@ bool config_load_vehicle(const char* filepath, VehicleJSON* out) {
             strncpy(out->physics.vehicle_name, out->name, 63);
             out->physics.vehicle_name[63] = '\0';
 
-            // Use motor_force directly from power plant (Jolt-compatible Newtons)
-            out->physics.accel_force = pp->motor_force;
+            // Store engine specs for Jolt drivetrain
+            out->physics.engine_max_torque = pp->torque_nm;
+            out->physics.engine_idle_rpm = pp->idle_rpm;
+            out->physics.engine_max_rpm = pp->redline_rpm;
 
-            // Calculate physics-based acceleration and 0-60 time
-            // a = F/m, t = v/a where v = 26.82 m/s (60 mph)
-            float accel_ms2 = pp->motor_force / out->chassis_mass;
+            // Estimate acceleration from torque (rough estimate using avg gear ratio)
+            // Real acceleration depends on current gear - Jolt handles this
+            float avg_gear_ratio = 1.5f;  // Approximate mid-range gear
+            float diff_ratio = 3.42f;     // Will be overridden by gearbox
+            float wheel_radius = 0.32f;   // Typical
+            float wheel_force = (pp->torque_nm * avg_gear_ratio * diff_ratio) / wheel_radius;
+            out->physics.accel_force = wheel_force;
+
+            float accel_ms2 = wheel_force / out->chassis_mass;
             out->physics.target_accel_ms2 = accel_ms2;
             out->physics.target_0_60_seconds = 26.82f / accel_ms2;
-
-            // Top speed not calculated - drivetrain simulation handles this
-            out->physics.top_speed_ms = 0.0f;
+            out->physics.top_speed_ms = 0.0f;  // Drivetrain simulation handles this
 
             float weight_lbs = out->chassis_mass / LBS_TO_KG;
-            printf("  Power Plant: %s (%.0fN, %.0fkg)\n", pp->name, pp->motor_force, pp->weight_kg);
-            printf("  Total Weight: %.0f kg (%.0f lbs), F/wt ratio: %.2f N/kg\n",
-                   out->chassis_mass, weight_lbs, pp->motor_force / out->chassis_mass);
-            printf("  Accel Class: %d mph/s (%.1fs 0-60, F=%.0fN)\n",
-                   (int)(accel_ms2 * 2.237f), out->physics.target_0_60_seconds, pp->motor_force);
-            printf("  Top Speed: 0 mph (0.0 m/s)\n");
+            printf("  Power Plant: %s (%.0f HP, %.0f Nm @ %.0f RPM)\n",
+                   pp->name, pp->horsepower, pp->torque_nm, pp->peak_torque_rpm);
+            printf("  Total Weight: %.0f kg (%.0f lbs), HP/ton: %.0f\n",
+                   out->chassis_mass, weight_lbs, pp->horsepower / (out->chassis_mass / 1000.0f));
+            printf("  Redline: %.0f RPM, Idle: %.0f RPM\n", pp->redline_rpm, pp->idle_rpm);
         } else {
             fprintf(stderr, "Warning: Power plant '%s' not found\n", pp_ref->valuestring);
         }
@@ -766,10 +771,16 @@ bool config_load_vehicle(const char* filepath, VehicleJSON* out) {
     // Real drivetrain mode: engine torque through gearbox
     out->physics.use_linear_accel = false;
 
-    // Engine defaults (for when use_linear_accel = false)
-    out->physics.engine_max_torque = 300.0f;    // Nm (typical sports car)
-    out->physics.engine_max_rpm = 6000.0f;       // RPM
-    out->physics.engine_idle_rpm = 1000.0f;      // RPM
+    // Engine defaults - ONLY if not already set by power plant
+    if (out->physics.engine_max_torque <= 0) {
+        out->physics.engine_max_torque = 300.0f;    // Nm (typical sports car)
+    }
+    if (out->physics.engine_max_rpm <= 0) {
+        out->physics.engine_max_rpm = 6000.0f;       // RPM
+    }
+    if (out->physics.engine_idle_rpm <= 0) {
+        out->physics.engine_idle_rpm = 1000.0f;      // RPM
+    }
 
     // Transmission defaults (standard 5-speed from gearboxes.json)
     out->physics.use_config_transmission = true;
@@ -789,15 +800,7 @@ bool config_load_vehicle(const char* filepath, VehicleJSON* out) {
     // ========== DRIVETRAIN SECTION ==========
     // Parse drivetrain if present - overrides defaults (use drivetrain_section from above)
     if (drivetrain_section) {
-        // Get engine physics from power plant (already looked up above)
-        if (pp_ref && cJSON_IsString(pp_ref)) {
-            const PowerPlantEquipment* pp = equipment_find_power_plant(pp_ref->valuestring);
-            if (pp) {
-                out->physics.engine_max_torque = pp->engine_max_torque;
-                out->physics.engine_idle_rpm = pp->engine_min_rpm;
-                out->physics.engine_max_rpm = pp->engine_max_rpm;
-            }
-        }
+        // Engine physics already set above from power plant lookup
 
         // Get gearbox from drivetrain
         cJSON* gearbox_ref = cJSON_GetObjectItem(drivetrain_section, "gearbox");
@@ -1264,4 +1267,145 @@ void config_apply_physics_mode(VehicleJSON* vehicle, const PhysicsMode* mode) {
     // Matchbox car physics is always on - accel_force is set during vehicle loading
     printf("    -> Accel force: %.0fN (%.1fs 0-60)\n",
            vehicle->physics.accel_force, vehicle->physics.target_0_60_seconds);
+}
+
+// ============================================================================
+// Friction Curve Loading
+// ============================================================================
+
+// Global active friction curve (generous by default)
+static FrictionCurve s_active_friction_curve = {
+    .name = "Generous (Arcade)",
+    .longitudinal = {
+        {0.00f, 0.0f},
+        {0.06f, 1.2f},
+        {0.20f, 1.0f},
+        {1.00f, 0.9f},
+        {10.0f, 0.85f}
+    },
+    .longitudinal_count = 5,
+    .lateral = {
+        {0.0f, 0.0f},
+        {3.0f, 1.0f},
+        {20.0f, 1.0f},
+        {90.0f, 0.9f}
+    },
+    .lateral_count = 4,
+    .lateral_rails_multiplier = 3.0f
+};
+
+bool config_load_friction_curve(const char* filepath, FrictionCurve* out) {
+    // Set generous defaults
+    memset(out, 0, sizeof(*out));
+    strcpy(out->name, "Generous (Arcade)");
+    out->longitudinal[0] = (FrictionPoint){0.00f, 0.0f};
+    out->longitudinal[1] = (FrictionPoint){0.06f, 1.2f};
+    out->longitudinal[2] = (FrictionPoint){0.20f, 1.0f};
+    out->longitudinal[3] = (FrictionPoint){1.00f, 0.9f};
+    out->longitudinal[4] = (FrictionPoint){10.0f, 0.85f};
+    out->longitudinal_count = 5;
+    out->lateral[0] = (FrictionPoint){0.0f, 0.0f};
+    out->lateral[1] = (FrictionPoint){3.0f, 1.0f};
+    out->lateral[2] = (FrictionPoint){20.0f, 1.0f};
+    out->lateral[3] = (FrictionPoint){90.0f, 0.9f};
+    out->lateral_count = 4;
+    out->lateral_rails_multiplier = 3.0f;
+
+    char* json_str = read_file(filepath);
+    if (!json_str) {
+        printf("[Physics] Friction curve config not found, using generous defaults\n");
+        s_active_friction_curve = *out;
+        return false;
+    }
+
+    cJSON* root = cJSON_Parse(json_str);
+    free(json_str);
+
+    if (!root) {
+        fprintf(stderr, "JSON parse error in %s\n", filepath);
+        s_active_friction_curve = *out;
+        return false;
+    }
+
+    // Get active curve name
+    char active_curve[64] = "generous";
+    json_get_string(root, "active_curve", active_curve, 64, "generous");
+
+    // Parse friction_curves
+    cJSON* curves = cJSON_GetObjectItem(root, "friction_curves");
+    if (!curves) {
+        cJSON_Delete(root);
+        s_active_friction_curve = *out;
+        return false;
+    }
+
+    // Get the active curve config
+    cJSON* curve_config = cJSON_GetObjectItem(curves, active_curve);
+    if (!curve_config) {
+        fprintf(stderr, "Warning: Friction curve '%s' not found, using generous\n", active_curve);
+        cJSON_Delete(root);
+        s_active_friction_curve = *out;
+        return false;
+    }
+
+    // Parse curve name
+    json_get_string(curve_config, "name", out->name, MAX_NAME_LENGTH, "Unknown");
+
+    // Parse longitudinal friction points
+    cJSON* longitudinal = cJSON_GetObjectItem(curve_config, "longitudinal");
+    if (longitudinal && cJSON_IsArray(longitudinal)) {
+        out->longitudinal_count = 0;
+        cJSON* point;
+        cJSON_ArrayForEach(point, longitudinal) {
+            if (out->longitudinal_count >= MAX_FRICTION_POINTS) break;
+            if (cJSON_IsArray(point) && cJSON_GetArraySize(point) >= 2) {
+                out->longitudinal[out->longitudinal_count].slip =
+                    (float)cJSON_GetArrayItem(point, 0)->valuedouble;
+                out->longitudinal[out->longitudinal_count].friction =
+                    (float)cJSON_GetArrayItem(point, 1)->valuedouble;
+                out->longitudinal_count++;
+            }
+        }
+    }
+
+    // Parse lateral friction
+    cJSON* lateral_config = cJSON_GetObjectItem(root, "lateral_friction");
+    if (lateral_config) {
+        out->lateral_rails_multiplier = json_get_float(lateral_config, "rails_multiplier", 3.0f);
+
+        cJSON* lateral_points = cJSON_GetObjectItem(lateral_config, "points");
+        if (lateral_points && cJSON_IsArray(lateral_points)) {
+            out->lateral_count = 0;
+            cJSON* point;
+            cJSON_ArrayForEach(point, lateral_points) {
+                if (out->lateral_count >= MAX_FRICTION_POINTS) break;
+                if (cJSON_IsArray(point) && cJSON_GetArraySize(point) >= 2) {
+                    out->lateral[out->lateral_count].slip =
+                        (float)cJSON_GetArrayItem(point, 0)->valuedouble;
+                    out->lateral[out->lateral_count].friction =
+                        (float)cJSON_GetArrayItem(point, 1)->valuedouble;
+                    out->lateral_count++;
+                }
+            }
+        }
+    }
+
+    cJSON_Delete(root);
+
+    // Store as active curve
+    s_active_friction_curve = *out;
+
+    printf("[Physics] Loaded friction curve: %s (%d longitudinal points)\n",
+           out->name, out->longitudinal_count);
+    for (int i = 0; i < out->longitudinal_count; i++) {
+        printf("  [%.0f%% slip -> %.0f%% grip]\n",
+               out->longitudinal[i].slip * 100.0f,
+               out->longitudinal[i].friction * 100.0f);
+    }
+
+    return true;
+}
+
+const FrictionCurve* config_get_friction_curve(void) {
+    return &s_active_friction_curve;
 }

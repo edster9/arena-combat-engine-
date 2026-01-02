@@ -1695,10 +1695,126 @@ int main(int argc, char* argv[]) {
             ui_rect(platform.width - 315, 465, 300, 50),
             turn_mode ? UI_COLOR_ACCENT : UI_COLOR_DISABLED, UI_COLOR_WHITE, 2.0f, 4.0f);
 
-        // Bottom status bar (two rows)
+        // Bottom status bar (two rows) - full width
         ui_draw_panel(&ui_renderer,
             ui_rect(10, platform.height - 70, platform.width - 340, 60),
             UI_COLOR_PANEL, UI_COLOR_SELECTED, 1.0f, 4.0f);
+
+        // ===== TOP-LEFT HUD OVERLAY (gauges and slip bars) =====
+        // Get physics data for HUD
+        Entity* hud_sel = entity_manager_get_selected(&entities);
+        int hud_phys_id = -1;
+        float hud_throttle = 0.0f;
+        float hud_brake = 0.0f;
+        float hud_slip[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+        float hud_speed_mph = 0.0f;
+        float hud_rpm = 0.0f;
+        float hud_redline = 6000.0f;
+        int hud_gear = 0;
+
+        if (hud_sel && hud_sel->id < MAX_ENTITIES) {
+            hud_phys_id = entity_to_physics[hud_sel->id];
+            if (hud_phys_id >= 0 && physics.vehicles[hud_phys_id].active) {
+                hud_throttle = physics.vehicles[hud_phys_id].throttle;
+                hud_brake = physics.vehicles[hud_phys_id].brake;
+
+                // Get wheel slip
+                WheelState ws[4];
+                physics_vehicle_get_wheel_states(&physics, hud_phys_id, ws);
+                for (int w = 0; w < 4; w++) {
+                    hud_slip[w] = fabsf(ws[w].longitudinal_slip);
+                    if (hud_slip[w] > 1.0f) hud_slip[w] = 1.0f;
+                }
+
+                // Get speed
+                hud_speed_mph = fabsf(car_physics[hud_sel->id].velocity) * 2.237f;
+
+                // Get RPM and gear
+                int raw_gear = 0;
+                bool is_matchbox = false;
+                physics_vehicle_get_drivetrain_info(&physics, hud_phys_id, &hud_gear, &hud_rpm, &raw_gear, &is_matchbox);
+            }
+        }
+
+        // HUD position (top-left, offset from edge)
+        float hud_x = 15.0f;
+        float hud_y = 15.0f;
+        float label_w = 35.0f;   // Width for labels (SPD, THR, BRK)
+        float gauge_w = 160.0f;  // Bar width
+        float gauge_h = 14.0f;   // Bar height
+        float row_h = 20.0f;     // Row spacing
+
+        // Semi-transparent background panel (taller to fit all elements)
+        ui_draw_panel(&ui_renderer,
+            ui_rect(hud_x - 5, hud_y - 5, label_w + gauge_w + 50, 150),
+            ui_color(0.05f, 0.08f, 0.15f, 0.85f), ui_color(0.2f, 0.3f, 0.4f, 0.8f), 1.0f, 6.0f);
+
+        float bar_x = hud_x + label_w;  // Bars start after labels
+
+        // Row 0: Speed gauge (0-120 mph scale)
+        float row0_y = hud_y;
+        float speed_pct = hud_speed_mph / 120.0f;
+        if (speed_pct > 1.0f) speed_pct = 1.0f;
+        ui_draw_rect(&ui_renderer, ui_rect(bar_x, row0_y, gauge_w, gauge_h), ui_color(0.12f, 0.12f, 0.18f, 1.0f));
+        if (speed_pct > 0.01f) {
+            ui_draw_rect(&ui_renderer, ui_rect(bar_x, row0_y, gauge_w * speed_pct, gauge_h), UI_COLOR_SELECTED);
+        }
+
+        // Row 1: RPM gauge (0-redline scale, red zone at 85%+)
+        float row1_y = row0_y + row_h;
+        float rpm_pct = hud_rpm / hud_redline;
+        if (rpm_pct > 1.0f) rpm_pct = 1.0f;
+        ui_draw_rect(&ui_renderer, ui_rect(bar_x, row1_y, gauge_w, gauge_h), ui_color(0.12f, 0.12f, 0.18f, 1.0f));
+        ui_draw_rect(&ui_renderer, ui_rect(bar_x + gauge_w * 0.85f, row1_y, gauge_w * 0.15f, gauge_h), ui_color(0.3f, 0.1f, 0.1f, 1.0f));
+        if (rpm_pct > 0.01f) {
+            UIColor rpm_color = rpm_pct > 0.85f ? UI_COLOR_DANGER : UI_COLOR_SAFE;
+            ui_draw_rect(&ui_renderer, ui_rect(bar_x, row1_y, gauge_w * rpm_pct, gauge_h), rpm_color);
+        }
+
+        // Row 2: Throttle bar
+        float row2_y = row1_y + row_h;
+        ui_draw_rect(&ui_renderer, ui_rect(bar_x, row2_y, gauge_w, gauge_h), ui_color(0.12f, 0.12f, 0.18f, 1.0f));
+        if (hud_throttle > 0.01f) {
+            ui_draw_rect(&ui_renderer, ui_rect(bar_x, row2_y, gauge_w * hud_throttle, gauge_h), UI_COLOR_SAFE);
+        }
+
+        // Row 3: Brake bar
+        float row3_y = row2_y + row_h;
+        ui_draw_rect(&ui_renderer, ui_rect(bar_x, row3_y, gauge_w, gauge_h), ui_color(0.12f, 0.12f, 0.18f, 1.0f));
+        if (hud_brake > 0.01f) {
+            ui_draw_rect(&ui_renderer, ui_rect(bar_x, row3_y, gauge_w * hud_brake, gauge_h), UI_COLOR_DANGER);
+        }
+
+        // Row 4: Wheel slip bars (4 horizontal bars)
+        float row4_y = row3_y + row_h + 4;
+        float slip_bar_w = 45.0f;
+        float slip_bar_h = 20.0f;
+        float slip_gap = 6.0f;
+
+        for (int w = 0; w < 4; w++) {
+            float wx = hud_x + w * (slip_bar_w + slip_gap);
+            float slip = hud_slip[w];
+
+            // Background
+            ui_draw_rect(&ui_renderer, ui_rect(wx, row4_y, slip_bar_w, slip_bar_h), ui_color(0.12f, 0.12f, 0.18f, 1.0f));
+
+            // Color based on slip amount
+            UIColor slip_color;
+            if (slip > 0.15f) {
+                slip_color = UI_COLOR_DANGER;
+            } else if (slip > 0.05f) {
+                slip_color = UI_COLOR_CAUTION;
+            } else {
+                slip_color = UI_COLOR_SAFE;
+            }
+
+            // Fill (horizontal bar showing slip %)
+            if (slip > 0.01f) {
+                float fill = slip;
+                if (fill > 1.0f) fill = 1.0f;
+                ui_draw_rect(&ui_renderer, ui_rect(wx, row4_y, slip_bar_w * fill, slip_bar_h), slip_color);
+            }
+        }
 
         ui_renderer_end(&ui_renderer);
 
@@ -1813,6 +1929,56 @@ int main(int argc, char* argv[]) {
             // Execute button label (moved down to Y=465)
             text_draw_centered(&text_renderer, "EXECUTE TURN",
                 ui_rect(platform.width - 315, 465, 300, 50), UI_COLOR_WHITE);
+
+            // Top-left HUD labels (must match bar positions!)
+            {
+                float hud_x = 15.0f;
+                float hud_y = 15.0f;
+                float row_h = 20.0f;      // Must match bar code
+                float gauge_w = 160.0f;   // Must match bar code
+
+                // Row 0: Speed label and value
+                float row0_y = hud_y;
+                char speed_str[16];
+                snprintf(speed_str, sizeof(speed_str), "%d", (int)hud_speed_mph);
+                text_draw(&text_renderer, "SPD", (int)hud_x, (int)(row0_y), UI_COLOR_DISABLED);
+                text_draw(&text_renderer, speed_str, (int)(hud_x + 200), (int)(row0_y), UI_COLOR_WHITE);
+
+                // Row 1: Gear + RPM
+                float row1_y = row0_y + row_h;
+                char gear_str[8];
+                if (hud_gear < 0) {
+                    snprintf(gear_str, sizeof(gear_str), "R");
+                } else if (hud_gear == 0) {
+                    snprintf(gear_str, sizeof(gear_str), "N");
+                } else {
+                    snprintf(gear_str, sizeof(gear_str), "%d", hud_gear);
+                }
+                char rpm_label[16];
+                snprintf(rpm_label, sizeof(rpm_label), "[%s]", gear_str);
+                text_draw(&text_renderer, rpm_label, (int)hud_x, (int)(row1_y), UI_COLOR_ACCENT);
+                char rpm_str[16];
+                snprintf(rpm_str, sizeof(rpm_str), "%.0f", hud_rpm);
+                text_draw(&text_renderer, rpm_str, (int)(hud_x + 200), (int)(row1_y), UI_COLOR_WHITE);
+
+                // Row 2: THR label
+                float row2_y = row1_y + row_h;
+                text_draw(&text_renderer, "THR", (int)hud_x, (int)(row2_y), UI_COLOR_DISABLED);
+
+                // Row 3: BRK label
+                float row3_y = row2_y + row_h;
+                text_draw(&text_renderer, "BRK", (int)hud_x, (int)(row3_y), UI_COLOR_DISABLED);
+
+                // Row 4: Wheel slip labels
+                float row4_y = row3_y + row_h + 4;  // Must match bar code
+                float slip_bar_w = 45.0f;           // Must match bar code
+                float slip_gap = 6.0f;              // Must match bar code
+                const char* wheel_labels[] = {"FL", "FR", "RL", "RR"};
+                for (int w = 0; w < 4; w++) {
+                    float wx = hud_x + w * (slip_bar_w + slip_gap);
+                    text_draw(&text_renderer, wheel_labels[w], (int)(wx + 12), (int)(row4_y + 3), UI_COLOR_DISABLED);
+                }
+            }
 
             // Status bar text - two rows with clear labels
             // Row 1: Mode, Vehicle, Speed, Target (common to both modes)

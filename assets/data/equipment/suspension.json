@@ -39,11 +39,11 @@
       "hc_van": 1,
       "hc_subcompact": 3,
       "physics": {
-        "frequency": 3.0,
-        "damping": 0.8,
-        "travel": 0.10
+        "frequency": 1.2,
+        "damping": 0.35,
+        "travel": 0.18
       },
-      "notes": "Costs 100% of body cost. +1 HC over light."
+      "notes": "Costs 100% of body cost. +1 HC over light. Soft springs, visible bounce."
     },
     "heavy": {
       "id": "suspension_heavy",

@@ -1,0 +1,62 @@
+{
+  "_meta": {
+    "description": "Global physics settings for tire friction curves",
+    "notes": [
+      "Friction curves define how grip changes with wheel slip",
+      "Each point is [slip_ratio, friction_multiplier]",
+      "slip_ratio: 0.0 = no slip, 1.0 = 100% slip (wheel spinning 2x ground speed)",
+      "friction_multiplier: multiplied by tire mu for final friction",
+      "Generous curve maintains grip at high slip (arcade-like)",
+      "Punishing curve drops grip at high slip (sim-like, TCS matters)"
+    ]
+  },
+
+  "friction_curves": {
+    "generous": {
+      "name": "Generous (Arcade)",
+      "description": "Maintains 85-90% grip even at extreme wheelspin. TCS has minimal impact.",
+      "longitudinal": [
+        [0.00, 0.0],
+        [0.06, 1.2],
+        [0.20, 1.0],
+        [1.00, 0.9],
+        [10.0, 0.85]
+      ]
+    },
+    "punishing": {
+      "name": "Punishing (Sim)",
+      "description": "Grip drops to 60% at 100% slip. TCS/launch control matters for acceleration.",
+      "longitudinal": [
+        [0.00, 0.0],
+        [0.06, 1.2],
+        [0.20, 1.0],
+        [1.00, 0.6]
+      ]
+    },
+    "realistic": {
+      "name": "Realistic (Pacejka-inspired)",
+      "description": "Peak at 6% slip, gradual dropoff. Balanced between arcade and sim.",
+      "longitudinal": [
+        [0.00, 0.0],
+        [0.06, 1.2],
+        [0.10, 1.1],
+        [0.20, 1.0],
+        [0.50, 0.8],
+        [1.00, 0.7]
+      ]
+    }
+  },
+
+  "active_curve": "generous",
+
+  "lateral_friction": {
+    "_note": "Lateral (cornering) friction - separate from longitudinal (acceleration)",
+    "rails_multiplier": 3.0,
+    "points": [
+      [0.0, 0.0],
+      [3.0, 1.0],
+      [20.0, 1.0],
+      [90.0, 0.9]
+    ]
+  }
+}

@@ -146,26 +146,19 @@ static bool load_power_plants(const char* filepath) {
                 p->weight_lbs = json_get_int(item, "weight", 0); \
                 p->spaces = json_get_int(item, "spaces", 0); \
                 p->power_units = json_get_int(item, "power_units", 0); \
-                /* Read force_n directly (Jolt-compatible Newton value) */ \
-                p->motor_force = json_get_float(item, "force_n", 0); \
                 p->weight_kg = p->weight_lbs * LBS_TO_KG; \
-                /* Engine physics for real drivetrain mode */ \
-                cJSON* physics = cJSON_GetObjectItem(item, "physics"); \
-                if (physics) { \
-                    p->engine_max_torque = json_get_float(physics, "max_torque", 0.0f); \
-                    p->engine_min_rpm = json_get_float(physics, "idle_rpm", 1000.0f); \
-                    p->engine_max_rpm = json_get_float(physics, "max_rpm", 6000.0f); \
+                /* Real engine specs */ \
+                p->horsepower = json_get_float(item, "horsepower", 100.0f); \
+                p->torque_nm = json_get_float(item, "torque_nm", 150.0f); \
+                p->peak_power_rpm = json_get_float(item, "peak_power_rpm", 6000.0f); \
+                p->peak_torque_rpm = json_get_float(item, "peak_torque_rpm", 4000.0f); \
+                p->redline_rpm = json_get_float(item, "redline_rpm", 7000.0f); \
+                p->idle_rpm = 1000.0f; /* Default idle */ \
+                /* Electric motors have instant torque (peak_torque_rpm = 0) */ \
+                if (strcmp(p->type, "electric") == 0 || strcmp(p->type, "nuclear") == 0) { \
+                    p->peak_torque_rpm = 0.0f; \
+                    p->idle_rpm = 0.0f; \
                 } \
-                /* Default engine torque derived from force_n if not specified */ \
-                /* Torque = Force * wheel_radius / (gear_ratio * diff_ratio) */ \
-                /* With 0.32m wheels, gear ~2.0, diff 3.42: T = F * 0.32 / 6.84 = F * 0.047 */ \
-                /* Use 0.055 for headroom (AWD + TCS handles extra power) */ \
-                if (p->engine_max_torque <= 0.0f && p->motor_force > 0) { \
-                    p->engine_max_torque = p->motor_force * 0.055f; \
-                    if (p->engine_max_torque < 50.0f) p->engine_max_torque = 50.0f; \
-                } \
-                if (p->engine_min_rpm <= 0.0f) p->engine_min_rpm = 1000.0f; \
-                if (p->engine_max_rpm <= 0.0f) p->engine_max_rpm = 6000.0f; \
                 g_equipment.power_plant_count++; \
             } \
         }

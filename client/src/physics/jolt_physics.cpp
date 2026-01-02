@@ -5,6 +5,7 @@
 
 #include "jolt_physics.h"
 #include "../render/line_render.h"
+#include "../game/config_loader.h"
 
 #include <iostream>
 #include <cmath>
@@ -270,12 +271,14 @@ void physics_step(PhysicsWorld* pw, float dt)
     {
         // Debug: print active vehicles every 2 seconds
         static float vehicleDebugTimer = 0;
+        static float totalElapsedTime = 0;
         vehicleDebugTimer += pw->step_size;
+        totalElapsedTime += pw->step_size;
         if (vehicleDebugTimer >= 2.0f) {
-            printf("Active vehicles: ");
+            printf("[T=%.1fs] Active vehicles: ", totalElapsedTime);
             for (int vi = 0; vi < MAX_PHYSICS_VEHICLES; vi++) {
                 if (pw->vehicles[vi].active) {
-                    printf("[%d: thr=%.1f] ", vi, pw->vehicles[vi].throttle);
+                    printf("[%d: thr=%.1f brk=%.1f] ", vi, pw->vehicles[vi].throttle, pw->vehicles[vi].brake);
                 }
             }
             printf("\n");
@@ -291,26 +294,40 @@ void physics_step(PhysicsWorld* pw, float dt)
                 float rpm = ctrl->GetEngine().GetCurrentRPM();
                 float clutch = ctrl->GetTransmission().GetClutchFriction();
 
-                // Check wheel slip on driven wheels (rear)
+                // Get vehicle speed
+                BodyInterface& bi = impl->physicsSystem->GetBodyInterface();
+                JPH::Vec3 velVec = bi.GetLinearVelocity(vimpl->bodyId);
+                float speed_mps = velVec.Length();
+                float speed_mph = speed_mps * 2.237f;
+
+                // Check wheel slip on ALL wheels to debug front wheel slip bug
                 const Wheels& wheels = vimpl->constraint->GetWheels();
-                float rl_slip = 0, rr_slip = 0;
-                bool rl_contact = false, rr_contact = false;
-                if (wheels.size() > WHEEL_RL) {
-                    const WheelWV* wRL = static_cast<const WheelWV*>(wheels[WHEEL_RL]);
-                    const WheelWV* wRR = static_cast<const WheelWV*>(wheels[WHEEL_RR]);
-                    rl_slip = wRL->mLongitudinalSlip;
-                    rr_slip = wRR->mLongitudinalSlip;
-                    rl_contact = wheels[WHEEL_RL]->HasContact();
-                    rr_contact = wheels[WHEEL_RR]->HasContact();
+                float slip[4] = {0, 0, 0, 0};
+                bool contact[4] = {false, false, false, false};
+                float steer[4] = {0, 0, 0, 0};
+                if (wheels.size() >= 4) {
+                    for (int w = 0; w < 4; w++) {
+                        const WheelWV* wv = static_cast<const WheelWV*>(wheels[w]);
+                        slip[w] = wv->mLongitudinalSlip;
+                        contact[w] = wheels[w]->HasContact();
+                        steer[w] = wheels[w]->GetSteerAngle();
+                    }
                 }
 
-                printf("  [Drivetrain] Gear:%d RPM:%.0f Clutch:%.2f Slip:RL=%.2f%s RR=%.2f%s\n",
-                       gear, rpm, clutch,
-                       rl_slip, rl_contact ? "" : "(air)",
-                       rr_slip, rr_contact ? "" : "(air)");
+                printf("  [Drivetrain] G:%d RPM:%.0f Clutch:%.2f Speed:%.0f mph\n", gear, rpm, clutch, speed_mph);
+                printf("    Slip: FL=%.2f%s FR=%.2f%s RL=%.2f%s RR=%.2f%s\n",
+                       slip[0], contact[0] ? "" : "(air)",
+                       slip[1], contact[1] ? "" : "(air)",
+                       slip[2], contact[2] ? "" : "(air)",
+                       slip[3], contact[3] ? "" : "(air)");
+                // Show steer angles if any wheel is turned
+                if (fabsf(steer[0]) > 0.01f || fabsf(steer[1]) > 0.01f) {
+                    printf("    Steer: FL=%.1f° FR=%.1f°\n",
+                           steer[0] * 57.2958f, steer[1] * 57.2958f);
+                }
 
                 // Show if slip would block upshift (>10%)
-                bool slipping = (rl_slip > 0.1f || rr_slip > 0.1f);
+                bool slipping = (slip[2] > 0.1f || slip[3] > 0.1f);
                 if (slipping) {
                     printf("    -> SLIP BLOCKING UPSHIFT (slip > 10%%)\n");
                 }
@@ -990,7 +1007,12 @@ int physics_create_vehicle(PhysicsWorld* pw, ::Vec3 position, float rotation_y, 
             config->wheel_steer_angles[i] : config->max_steer_angle;
         ws->mMaxSteerAngle = canSteer ? maxSteer : 0.0f;
 
-        // Brakes on rear wheels
+        // Regular brakes on all wheels - enough torque to lock wheels
+        // Friction curve limits actual deceleration (not brake torque)
+        // 1500 Nm per wheel is plenty to overcome tire grip
+        ws->mMaxBrakeTorque = 1500.0f;
+
+        // Handbrake on rear wheels only
         ws->mMaxHandBrakeTorque = (i == WHEEL_RL || i == WHEEL_RR) ? 4000.0f : 0.0f;
 
         // Wheel inertia - affects how easily wheels spin
@@ -1003,23 +1025,30 @@ int physics_create_vehicle(PhysicsWorld* pw, ::Vec3 position, float rotation_y, 
         // Tire friction - scale friction curves by mu value
         float tireMu = config->tire_friction;
         if (tireMu <= 0) tireMu = 1.0f;  // Default friction coefficient
-        // Jolt's friction curves: slip ratio/angle -> friction multiplier
-        // Scale by our mu to get actual friction
-        // IMPORTANT: Curve must extend to 1.0 (100% slip) for wheelspin scenarios
-        ws->mLongitudinalFriction.mPoints.clear();
-        ws->mLongitudinalFriction.mPoints.push_back({0.0f, 0.0f});
-        ws->mLongitudinalFriction.mPoints.push_back({0.06f, tireMu * 1.2f});  // Peak at 6% slip
-        ws->mLongitudinalFriction.mPoints.push_back({0.2f, tireMu * 1.0f});   // Transition
-        ws->mLongitudinalFriction.mPoints.push_back({1.0f, tireMu * 0.8f});   // Full wheelspin (80% of mu)
 
-        // RAILS MODE: High lateral friction - car grips through turns without flipping
-        // This is the "default" behavior; disasters will temporarily reduce this
-        const float railsMultiplier = 3.0f;  // 3x normal grip (5x caused rollovers)
+        // Load friction curve from config (physics.json)
+        const FrictionCurve* curve = config_get_friction_curve();
+
+        // Apply longitudinal (acceleration/braking) friction curve
+        ws->mLongitudinalFriction.mPoints.clear();
+        for (int p = 0; p < curve->longitudinal_count; p++) {
+            ws->mLongitudinalFriction.mPoints.push_back({
+                curve->longitudinal[p].slip,
+                tireMu * curve->longitudinal[p].friction
+            });
+        }
+
+        // Apply lateral (cornering) friction curve with rails multiplier
+        float railsMultiplier = curve->lateral_rails_multiplier;
+        if (railsMultiplier <= 0) railsMultiplier = 3.0f;  // Default
+
         ws->mLateralFriction.mPoints.clear();
-        ws->mLateralFriction.mPoints.push_back({0.0f, 0.0f});
-        ws->mLateralFriction.mPoints.push_back({3.0f, tireMu * railsMultiplier});   // Peak grip
-        ws->mLateralFriction.mPoints.push_back({20.0f, tireMu * railsMultiplier});  // Still gripping
-        ws->mLateralFriction.mPoints.push_back({90.0f, tireMu * railsMultiplier * 0.9f});  // Even sideways, high grip
+        for (int p = 0; p < curve->lateral_count; p++) {
+            ws->mLateralFriction.mPoints.push_back({
+                curve->lateral[p].slip,
+                tireMu * curve->lateral[p].friction * railsMultiplier
+            });
+        }
 
         vehicleSettings.mWheels.push_back(ws);
     }

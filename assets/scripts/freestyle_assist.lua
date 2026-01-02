@@ -24,6 +24,8 @@
 -- Load reusable modules (singletons - use ctx.state for per-entity data)
 local abs = require("modules/abs")
 local tcs = require("modules/tcs")
+local launch_control = require("modules/launch_control")
+local timer_0_60 = require("modules/timer_0_60")
 
 -- ============================================================================
 -- CONFIGURATION
@@ -81,6 +83,10 @@ function update(ctx)
 
     -- Run all enabled assists (pass ctx - modules use ctx.state for per-entity data)
     abs.update(ctx)
+    launch_control.update(ctx)  -- TEST B: Throttle limiting before TCS
     tcs.update(ctx)
     esc_update(ctx)
+
+    -- Performance timing (always active)
+    timer_0_60.update(ctx)
 end

@@ -49,13 +49,14 @@ typedef struct {
     int weight_lbs;
     int spaces;
     int power_units;
-    // Physics values
-    float motor_force;      // Newtons (read directly from force_n in JSON)
     float weight_kg;        // Converted from lbs
-    // Engine physics (for real drivetrain mode)
-    float engine_max_torque;   // Nm - peak torque
-    float engine_min_rpm;      // RPM - idle
-    float engine_max_rpm;      // RPM - redline
+    // Real engine specs (car shop values)
+    float horsepower;          // Peak HP (display value)
+    float torque_nm;           // Peak torque in Nm
+    float peak_power_rpm;      // RPM at peak HP
+    float peak_torque_rpm;     // RPM at peak torque (0 = instant for electric)
+    float redline_rpm;         // Maximum safe RPM
+    float idle_rpm;            // Idle RPM
 } PowerPlantEquipment;
 
 // Gearbox equipment

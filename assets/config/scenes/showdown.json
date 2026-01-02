@@ -2,7 +2,7 @@
   "name": "Showdown Arena",
 
   "arena": {
-    "size": 800.0,
+    "size": 2000.0,
     "wall_height": 4.0,
     "wall_thickness": 1.0,
     "ground_y": 0.0

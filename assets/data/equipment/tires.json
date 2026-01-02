@@ -13,10 +13,16 @@
       "Cycle tires cost same but weigh half as much"
     ],
     "physics_values": {
-      "_notes": "Physics traction - standardized across all tires to match tabletop (tires don't affect acceleration)",
-      "mu": "Friction coefficient - SAME for all tire types (2.0). Tire choice affects handling/damage, not accel.",
-      "tuning_note": "mu=2.0 balanced with gear ratios to achieve tabletop 10 mph/s acceleration",
-      "future_extension": "If adding realistic tire physics later, could add optional mu_override per tire"
+      "_notes": "Realistic tire friction coefficients for physics simulation",
+      "mu": "Friction coefficient (grip). Real tires on dry asphalt: 0.8-1.2. Racing slicks: 1.2-1.5",
+      "tuning_note": "Combined friction = tire_mu × ground_mu. Ground defaults to 1.0 (dry asphalt)",
+      "tire_types": {
+        "standard": "0.9 - basic street tire",
+        "heavy_duty": "0.85 - harder compound for durability",
+        "puncture_resistant": "0.8 - harder compound resists punctures",
+        "solid": "0.6 - very hard, minimal grip",
+        "plasticore": "0.7 - hardened core reduces grip"
+      }
     }
   },
 
@@ -30,7 +36,7 @@
       "spike_damage_modifier": 1.0,
       "debris_damage_modifier": 1.0,
       "physics": {
-        "mu": 6.0
+        "mu": 0.9
       }
     },
     "heavy_duty": {
@@ -42,7 +48,7 @@
       "spike_damage_modifier": 1.0,
       "debris_damage_modifier": 1.0,
       "physics": {
-        "mu": 2.0
+        "mu": 0.85
       }
     },
     "puncture_resistant": {
@@ -54,7 +60,7 @@
       "spike_damage_modifier": 1.0,
       "debris_damage_modifier": 1.0,
       "physics": {
-        "mu": 2.0
+        "mu": 0.8
       }
     },
     "solid": {
@@ -66,7 +72,7 @@
       "spike_damage_modifier": 0.5,
       "debris_damage_modifier": 0.0,
       "physics": {
-        "mu": 2.0
+        "mu": 0.6
       },
       "notes": "Half damage from spikes, immune to debris"
     },
@@ -80,7 +86,7 @@
       "debris_damage_modifier": 1.0,
       "core_dp": 21,
       "physics": {
-        "mu": 2.0
+        "mu": 0.7
       },
       "notes": "After 4 DP damage, rubber strips off exposing core. HC drops by 1 when any tire exposed. Cannot be radial or off-road. Cannot be steelbelted."
     }
@@ -104,10 +110,10 @@
       "dp_modifier": -1,
       "hc_bonus": 1,
       "physics_modifier": {
-        "mu_bonus": 0
+        "mu_bonus": 0.1
       },
       "compatible_with": ["standard", "heavy_duty", "puncture_resistant", "solid"],
-      "notes": "Must be on all wheels for HC bonus. Applied after steelbelting."
+      "notes": "Must be on all wheels for HC bonus. Applied after steelbelting. +0.1 friction."
     },
     "off_road": {
       "id": "mod_off_road",
@@ -117,10 +123,11 @@
       "hc_bonus_offroad": 1,
       "no_terrain_damage": true,
       "physics_modifier": {
-        "mu_bonus": 0
+        "mu_bonus": -0.1,
+        "mu_offroad_bonus": 0.3
       },
       "compatible_with": ["standard", "heavy_duty", "puncture_resistant", "solid"],
-      "notes": "Must be on all wheels. No bonus on highway. Cannot combine with radial."
+      "notes": "Must be on all wheels. -0.1 friction on road, +0.3 on dirt/gravel. Cannot combine with radial."
     },
     "racing_slick": {
       "id": "mod_racing_slick",
@@ -137,10 +144,10 @@
       "road_wear_damage": 1,
       "road_wear_interval_minutes": 10,
       "physics_modifier": {
-        "mu_bonus": 0
+        "mu_bonus": 1.6
       },
       "compatible_with": ["standard", "heavy_duty", "puncture_resistant", "solid"],
-      "notes": "HC +2 if on all wheels, +1 if front or back only. D3 hazard just hitting oil/ice/water. Takes double damage from spikes/debris. 1 DP per 10 min on regular roads."
+      "notes": "Racing slick. mu=2.5 total (Corvette-class grip)."
     },
     "fireproof": {
       "id": "mod_fireproof",

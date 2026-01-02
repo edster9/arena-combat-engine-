@@ -201,6 +201,21 @@ void reflex_update_vehicle(ReflexScriptEngine* engine,
     telemetry["speed"] = ms_to_mph(speed_ms);
     telemetry["speed_ms"] = speed_ms;
 
+    // Accumulated time for rate-limiting in scripts
+    // Only increment once per frame (on vehicle 0), not per vehicle
+    static float accumulated_time = 0.0f;
+    static int debug_counter = 0;
+    if (vehicle_id == 0) {
+        accumulated_time += dt;
+        // Debug: print time every ~2 seconds to verify sync with physics [T=X.Xs] log
+        debug_counter++;
+        if (debug_counter % 120 == 0) {  // Roughly every 2 seconds at 60fps
+            std::cout << "[Script] accumulated_time=" << accumulated_time
+                      << "s (dt=" << dt << ")" << std::endl;
+        }
+    }
+    telemetry["time"] = accumulated_time;
+
     // Wheel data for slip calculations
     sol::table wheels = engine->lua.create_table();
     for (int w = 0; w < 4; w++) {
@@ -221,6 +236,12 @@ void reflex_update_vehicle(ReflexScriptEngine* engine,
         "brake", vehicle->brake,
         "handbrake", vehicle->handbrake
     );
+    // Per-wheel brake for TCS/ABS (Lua 1-indexed: 1=FL, 2=FR, 3=RL, 4=RR)
+    sol::table wheel_brake = engine->lua.create_table();
+    for (int w = 0; w < 4; w++) {
+        wheel_brake[w + 1] = 0.0f;  // Initialize to 0
+    }
+    controls["wheel_brake"] = wheel_brake;
     ctx["controls"] = controls;
 
     // ========================================
@@ -247,6 +268,19 @@ void reflex_update_vehicle(ReflexScriptEngine* engine,
     out_controls.brake = controls.get_or("brake", 0.0f);
     out_controls.handbrake = controls.get_or("handbrake", 0.0f);
     out_controls.controls_modified = true;
+
+    // Read back per-wheel brake values (for TCS/ABS)
+    sol::optional<sol::table> wb_opt = controls["wheel_brake"];
+    if (wb_opt) {
+        sol::table wb = *wb_opt;
+        bool any_wheel_brake = false;
+        for (int w = 0; w < 4; w++) {
+            float brake_val = wb.get_or(w + 1, 0.0f);  // Lua 1-indexed
+            out_controls.wheel_brake[w] = brake_val;
+            if (brake_val > 0.01f) any_wheel_brake = true;
+        }
+        out_controls.use_per_wheel_brake = any_wheel_brake;
+    }
 
     reflex_apply_controls(pw, vehicle_id, &out_controls);
 }
