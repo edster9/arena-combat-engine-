@@ -120,18 +120,23 @@ ReflexScriptEngine* reflex_create(void);
 void reflex_destroy(ReflexScriptEngine* engine);
 
 // Attach a script to a vehicle (creates isolated script instance)
+// script_name: identifier for the script (e.g., "freestyle_assist", "turn_executor")
 // script_path: path to the vehicle's script (e.g., "scripts/freestyle_assist.lua")
 // config_keys/values: configuration options passed to script as 'config' table
 // Returns true on success
 bool reflex_attach_script(ReflexScriptEngine* engine,
                           int vehicle_id,
+                          const char* script_name,
                           const char* script_path,
                           const char* config_keys[],
                           float config_values[],
                           int config_count);
 
-// Detach script from a vehicle
-void reflex_detach_script(ReflexScriptEngine* engine, int vehicle_id);
+// Detach a specific script from a vehicle
+void reflex_detach_script(ReflexScriptEngine* engine, int vehicle_id, const char* script_name);
+
+// Detach all scripts from a vehicle
+void reflex_detach_all(ReflexScriptEngine* engine, int vehicle_id);
 
 // Update a vehicle's script
 // Gathers telemetry, calls script update(), applies control outputs
@@ -149,6 +154,87 @@ int reflex_reload_all_scripts(ReflexScriptEngine* engine);
 void reflex_apply_controls(PhysicsWorld* pw,
                            int vehicle_id,
                            const ScriptControls* controls);
+
+// === Turn-Based Maneuver Control ===
+
+// Maneuver result from turn evaluation
+typedef struct {
+    bool success;           // Did the maneuver succeed?
+    const char* level;      // "perfect", "good", "partial", "failed"
+    float heading_error;    // Degrees off from target
+    float position_error;   // Meters off from target
+    float heading_achieved; // Actual heading change in degrees
+    float heading_target;   // Target heading change in degrees
+} ManeuverResult;
+
+// Start a turn with a declared maneuver
+// maneuver_type: "straight", "drift", "bend_45", "bootlegger", etc.
+// direction: "left", "right", or "center"
+// duration: turn duration in seconds (typically 1.0)
+// Returns true if maneuver started successfully
+bool reflex_start_turn(ReflexScriptEngine* engine,
+                       int vehicle_id,
+                       const char* maneuver_type,
+                       const char* direction,
+                       float duration);
+
+// End the current turn and get the result
+// Should be called after turn_duration seconds have elapsed
+// Returns the maneuver result (success, heading error, etc.)
+ManeuverResult reflex_end_turn(ReflexScriptEngine* engine,
+                               int vehicle_id);
+
+// Check if a turn is currently active for a vehicle
+bool reflex_is_turn_active(ReflexScriptEngine* engine, int vehicle_id);
+
+// === Test Sequence Control ===
+
+// Start a test sequence on a vehicle
+// sequence_name: "smoke_test", "basic_bends", "all_bends", etc.
+bool reflex_start_test_sequence(ReflexScriptEngine* engine,
+                                 int vehicle_id,
+                                 const char* sequence_name);
+
+// Stop the current test sequence
+void reflex_stop_test_sequence(ReflexScriptEngine* engine);
+
+// Check if a test sequence is running
+bool reflex_is_test_running(ReflexScriptEngine* engine);
+
+// === Input Handling ===
+
+// Pass input state to scripts
+// keys_pressed: array of booleans for keys pressed this frame (MAX_KEYS = 512)
+// selected_vehicle_id: ID of currently selected vehicle (-1 if none)
+// Scripts can register handlers for specific keys
+void reflex_on_input(ReflexScriptEngine* engine,
+                     const bool* keys_pressed,
+                     int key_count,
+                     int selected_vehicle_id);
+
+// === Event System ===
+
+// Event data for passing structured information to scripts
+typedef struct {
+    const char* keys[16];    // Field names
+    float values[16];        // Field values (floats or encoded strings)
+    const char* strings[16]; // String values (NULL if using float)
+    int count;               // Number of fields
+} ScriptEventData;
+
+// Send an event to scripts attached to a vehicle
+// event_name: identifier like "execute_maneuver", "cancel_maneuver", etc.
+// data: optional structured data (can be NULL)
+// Scripts with on_event() handlers will receive this
+void reflex_send_event(ReflexScriptEngine* engine,
+                       int vehicle_id,
+                       const char* event_name,
+                       const ScriptEventData* data);
+
+// Helper to create event data
+ScriptEventData reflex_event_data_create(void);
+void reflex_event_data_add_float(ScriptEventData* data, const char* key, float value);
+void reflex_event_data_add_string(ScriptEventData* data, const char* key, const char* value);
 
 #ifdef __cplusplus
 }

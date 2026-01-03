@@ -1,0 +1,393 @@
+{
+  "_meta": {
+    "description": "Maneuver goal definitions for physics-based turn execution",
+    "notes": [
+      "Each maneuver defines goals the script tries to achieve in 1 second",
+      "Success is evaluated at turn end based on tolerances",
+      "Scripts apply controls (steering, throttle, brake) to reach goals",
+      "tabletop scale: 1 inch = 4.572 meters"
+    ],
+    "units": {
+      "distance": "meters",
+      "angle": "degrees",
+      "speed": "m/s",
+      "time": "seconds"
+    }
+  },
+
+  "scale": {
+    "inch_to_meters": 4.572,
+    "quarter_inch": 1.143,
+    "half_inch": 2.286,
+    "three_quarter_inch": 3.429
+  },
+
+  "maneuvers": {
+    "straight": {
+      "id": "straight",
+      "name": "Straight",
+      "difficulty": 0,
+      "description": "Maintain heading, no lateral movement",
+      "goals": {
+        "heading_delta": 0,
+        "lateral_offset": 0
+      },
+      "tolerances": {
+        "heading_degrees": 5,
+        "lateral_meters": 0.5
+      },
+      "control_hints": {
+        "steering": "center",
+        "throttle": "maintain_speed",
+        "brake": "none"
+      },
+      "speed_requirements": {
+        "min_mph": 0,
+        "max_mph": 999
+      }
+    },
+
+    "drift": {
+      "id": "drift",
+      "name": "Drift",
+      "difficulty": 1,
+      "description": "Quarter-inch lateral shift, maintain heading",
+      "goals": {
+        "heading_delta": 0,
+        "lateral_offset_inches": 0.25
+      },
+      "tolerances": {
+        "heading_degrees": 5,
+        "lateral_meters": 0.3
+      },
+      "control_hints": {
+        "steering": "slight_opposite_then_correct",
+        "throttle": "maintain_speed",
+        "brake": "none"
+      },
+      "speed_requirements": {
+        "min_mph": 0,
+        "max_mph": 999
+      }
+    },
+
+    "steep_drift": {
+      "id": "steep_drift",
+      "name": "Steep Drift",
+      "difficulty": 3,
+      "description": "Half-inch lateral shift, maintain heading",
+      "goals": {
+        "heading_delta": 0,
+        "lateral_offset_inches": 0.5
+      },
+      "tolerances": {
+        "heading_degrees": 8,
+        "lateral_meters": 0.4
+      },
+      "control_hints": {
+        "steering": "moderate_opposite_then_correct",
+        "throttle": "maintain_speed",
+        "brake": "none"
+      },
+      "speed_requirements": {
+        "min_mph": 0,
+        "max_mph": 999
+      }
+    },
+
+    "bend_15": {
+      "id": "bend_15",
+      "name": "Bend 15°",
+      "difficulty": 1,
+      "description": "Gentle 15-degree turn",
+      "goals": {
+        "heading_delta": 15,
+        "follow_arc": true
+      },
+      "tolerances": {
+        "heading_degrees": 5,
+        "position_meters": 1.0
+      },
+      "control_hints": {
+        "steering": "gentle_turn",
+        "throttle": "maintain_speed",
+        "brake": "none"
+      },
+      "speed_requirements": {
+        "min_mph": 0,
+        "max_mph": 999
+      }
+    },
+
+    "bend_30": {
+      "id": "bend_30",
+      "name": "Bend 30°",
+      "difficulty": 2,
+      "description": "Moderate 30-degree turn",
+      "goals": {
+        "heading_delta": 30,
+        "follow_arc": true
+      },
+      "tolerances": {
+        "heading_degrees": 8,
+        "position_meters": 1.5
+      },
+      "control_hints": {
+        "steering": "moderate_turn",
+        "throttle": "maintain_speed",
+        "brake": "light_if_fast"
+      },
+      "speed_requirements": {
+        "min_mph": 0,
+        "max_mph": 999
+      }
+    },
+
+    "bend_45": {
+      "id": "bend_45",
+      "name": "Bend 45°",
+      "difficulty": 3,
+      "description": "Sharp 45-degree turn",
+      "goals": {
+        "heading_delta": 45,
+        "follow_arc": true
+      },
+      "tolerances": {
+        "heading_degrees": 10,
+        "position_meters": 2.0
+      },
+      "control_hints": {
+        "steering": "sharp_turn",
+        "throttle": "reduce_slightly",
+        "brake": "light"
+      },
+      "speed_requirements": {
+        "min_mph": 0,
+        "max_mph": 999
+      }
+    },
+
+    "bend_60": {
+      "id": "bend_60",
+      "name": "Bend 60°",
+      "difficulty": 4,
+      "description": "Very sharp 60-degree turn",
+      "goals": {
+        "heading_delta": 60,
+        "follow_arc": true
+      },
+      "tolerances": {
+        "heading_degrees": 12,
+        "position_meters": 2.5
+      },
+      "control_hints": {
+        "steering": "near_full_lock",
+        "throttle": "reduce",
+        "brake": "moderate"
+      },
+      "speed_requirements": {
+        "min_mph": 0,
+        "max_mph": 80
+      }
+    },
+
+    "bend_75": {
+      "id": "bend_75",
+      "name": "Bend 75°",
+      "difficulty": 5,
+      "description": "Extreme 75-degree turn",
+      "goals": {
+        "heading_delta": 75,
+        "follow_arc": true
+      },
+      "tolerances": {
+        "heading_degrees": 15,
+        "position_meters": 3.0
+      },
+      "control_hints": {
+        "steering": "full_lock",
+        "throttle": "off",
+        "brake": "moderate_to_heavy"
+      },
+      "speed_requirements": {
+        "min_mph": 0,
+        "max_mph": 60
+      }
+    },
+
+    "bend_90": {
+      "id": "bend_90",
+      "name": "Bend 90°",
+      "difficulty": 6,
+      "description": "Right-angle 90-degree turn",
+      "goals": {
+        "heading_delta": 90,
+        "follow_arc": true
+      },
+      "tolerances": {
+        "heading_degrees": 15,
+        "position_meters": 3.5
+      },
+      "control_hints": {
+        "steering": "full_lock",
+        "throttle": "off",
+        "brake": "heavy"
+      },
+      "speed_requirements": {
+        "min_mph": 0,
+        "max_mph": 45
+      }
+    },
+
+    "swerve": {
+      "id": "swerve",
+      "name": "Swerve",
+      "difficulty": 3,
+      "description": "Lane change - drift then opposite bend to straighten",
+      "goals": {
+        "heading_delta": 0,
+        "lateral_offset_inches": 0.5,
+        "two_phase": true,
+        "phase1": "drift",
+        "phase2": "countersteer"
+      },
+      "tolerances": {
+        "heading_degrees": 10,
+        "lateral_meters": 0.5
+      },
+      "control_hints": {
+        "steering": "turn_then_countersteer",
+        "throttle": "maintain_speed",
+        "brake": "none"
+      },
+      "speed_requirements": {
+        "min_mph": 10,
+        "max_mph": 999
+      }
+    },
+
+    "controlled_skid": {
+      "id": "controlled_skid",
+      "name": "Controlled Skid",
+      "difficulty_base": 1,
+      "difficulty_per_quarter": 1,
+      "description": "Powerslide with intentional oversteer",
+      "goals": {
+        "allow_slip": true,
+        "max_slip_angle": 45,
+        "heading_delta_variable": true,
+        "skid_distance_inches": [0.25, 0.5, 0.75, 1.0]
+      },
+      "tolerances": {
+        "heading_degrees": 20,
+        "position_meters": 2.0
+      },
+      "control_hints": {
+        "steering": "initiate_then_countersteer",
+        "throttle": "modulate_for_slip",
+        "brake": "rear_bias_or_ebrake"
+      },
+      "speed_requirements": {
+        "min_mph": 20,
+        "max_mph": 999
+      }
+    },
+
+    "t_stop": {
+      "id": "t_stop",
+      "name": "T-Stop",
+      "difficulty": 1,
+      "difficulty_per_10mph": 1,
+      "description": "Emergency stop with 90-degree rotation",
+      "goals": {
+        "final_speed": 0,
+        "heading_delta": 90,
+        "stop_distance_short": true
+      },
+      "tolerances": {
+        "heading_degrees": 15,
+        "speed_tolerance_mph": 2
+      },
+      "control_hints": {
+        "steering": "full_lock",
+        "throttle": "off",
+        "brake": "maximum_with_ebrake"
+      },
+      "speed_requirements": {
+        "min_mph": 5,
+        "max_mph": 60
+      }
+    },
+
+    "pivot": {
+      "id": "pivot",
+      "name": "Pivot",
+      "difficulty": 0,
+      "description": "Low-speed rotation around rear corner",
+      "goals": {
+        "heading_delta_variable": true,
+        "pivot_point": "rear_corner",
+        "speed_must_be": 5
+      },
+      "tolerances": {
+        "heading_degrees": 10,
+        "position_meters": 1.0
+      },
+      "control_hints": {
+        "steering": "full_lock",
+        "throttle": "creep",
+        "brake": "rear_locked"
+      },
+      "speed_requirements": {
+        "min_mph": 5,
+        "max_mph": 5
+      }
+    },
+
+    "bootlegger": {
+      "id": "bootlegger",
+      "name": "Bootlegger (J-Turn)",
+      "difficulty": 7,
+      "description": "180-degree spin reversal - the hardest maneuver",
+      "goals": {
+        "heading_delta": 180,
+        "final_direction": "reversed",
+        "controlled_spin": true
+      },
+      "tolerances": {
+        "heading_degrees": 20,
+        "position_meters": 5.0
+      },
+      "control_hints": {
+        "steering": "full_lock_initiate_spin",
+        "throttle": "off_then_power_out",
+        "brake": "ebrake_to_break_traction"
+      },
+      "speed_requirements": {
+        "min_mph": 20,
+        "max_mph": 35,
+        "notes": "Must be between 20-35 mph to attempt"
+      },
+      "execution_phases": [
+        {"phase": "initiate", "action": "ebrake + full steering", "duration": 0.3},
+        {"phase": "rotate", "action": "maintain steering, modulate ebrake", "duration": 0.4},
+        {"phase": "exit", "action": "release, countersteer, throttle", "duration": 0.3}
+      ]
+    }
+  },
+
+  "evaluation": {
+    "success_levels": {
+      "perfect": {"heading_pct": 0.5, "position_pct": 0.5},
+      "good": {"heading_pct": 0.75, "position_pct": 0.75},
+      "partial": {"heading_pct": 1.0, "position_pct": 1.0},
+      "failed": "exceeds tolerances"
+    },
+    "notes": [
+      "Perfect: within 50% of tolerance",
+      "Good: within 75% of tolerance",
+      "Partial: within 100% of tolerance",
+      "Failed: exceeded tolerance - loss of control"
+    ]
+  }
+}

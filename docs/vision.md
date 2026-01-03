@@ -2,158 +2,130 @@
 
 ## The Core Concept
 
-**"A tabletop game that came to life."**
+**"A virtual tabletop that came to life."**
 
-This is not a realistic racing simulator. This is not an arcade shooter. This is the experience of playing a classic vehicular combat tabletop game with your friends - but the miniatures move on their own, the dice roll themselves, and the explosions are real.
+This is not a realistic racing simulator. This is not an arcade shooter. This is the experience of playing a tactical vehicular combat game with friends - but the miniatures move on their own, physics determines outcomes, and the explosions are real.
 
 ---
 
 ## Visual Identity
 
-### The Book Art Feel (DECISION)
+### The VTT Aesthetic
 
-The visual style should evoke classic 80s tabletop game books and magazines - not a literal tabletop, but that distinctive illustrated aesthetic.
+The visual style evokes the feel of a premium virtual tabletop - clean, readable, and tactically focused, but with the depth and immersion of 3D physics.
 
 **Key direction:**
 - Technical illustration quality - detailed but stylized
-- Gritty 80s post-apocalyptic, not grimdark or cartoony
-- **NOT** trying to look like a game board on a table
-- **IS** trying to capture the feel of book art come to life
+- Industrial arena aesthetic - not grimdark, not cartoony
+- Grid is visible but integrated (painted lines, not glowing overlay)
+- UI uses clean modern design with tactical information density
 
 Elements:
-- **Vehicles** have that illustrated quality - bold colors, visible wear, chunky proportions
-- **The Arena** feels industrial and lived-in
-- **The Grid** is visible but integrated (painted lines on concrete, not glowing overlay)
-- **UI** uses the record sheet aesthetic, typewriter fonts, stamped text
+- **Vehicles** have bold colors for team identification with visible wear
+- **The Arena** feels industrial and purpose-built
+- **Physics** is real - vehicles skid, roll, and tumble
+- **Information** is always readable and actionable
 
 ### The 3D Reality
 
 But this tabletop has come alive:
 
 - Vehicles have **real physics** - they skid, roll, tumble when hit hard
-- **Fire and smoke** billow from damaged cars - tangible, not particle-spam
+- **Fire and smoke** billow from damaged cars
 - **Metal deforms**, paint scratches, wheels blow out
 - **Shadows and lighting** give depth and drama
-- When a car explodes, debris scatters across the board
+- When a car explodes, debris scatters across the arena
 
-### The Hybrid Aesthetic
+### The Balance
 
 ```
 NOT THIS:                          THIS:
-────────────────                   ────────────────
+----------------                   ----------------
 Hyper-realistic                    Stylized but solid
 Photo-real cars                    Miniature/model feel
-Video game HUD                     Tabletop information display
-Generic post-apocalypse            Distinctive world with personality
+Cluttered HUD                      Clean tactical display
+Generic apocalypse                 Distinctive arena sport
 ```
 
 ---
 
-## Reference Points
-
-### Games to Study
-
-| Game | What to Take |
-|------|--------------|
-| **Tabletop Simulator** | Physical objects on a table, camera perspective |
-| **Inscryption** | Paper/cardboard aesthetic that feels alive and dangerous |
-| **Wartales / Battle Brothers** | Miniature figurine feel, tactical weight |
-| **Hand of Fate** | Cards and tabletop but cinematic presentation |
-| **Into the Breach** | Clean tactical grid, readable but stylish |
-| **XCOM** | Turn resolution drama, camera follows action |
-
-### Visual Language
-
-Classic tabletop vehicular combat has a specific visual language:
-
-- Gritty but not grimdark cover art
-- Vehicle counters - top-down, detailed silhouettes
-- Arena maps - clean grids, industrial structures
-- Technical illustration style for equipment catalogs
-- Action scenes with 80s sci-fi aesthetic
-
-This isn't Mad Max chrome-and-leather. It's working-class America with guns on cars.
-
----
-
-## Color Palette (Direction)
+## Color Palette
 
 | Element | Feel |
 |---------|------|
 | **Arena floor** | Concrete grey, worn asphalt, oil stains |
 | **Arena walls** | Industrial - corrugated metal, concrete barriers |
-| **Vehicles** | Bold primary colors (team identification) with weathering |
+| **Vehicles** | Bold team colors with weathering |
 | **Fire/Explosions** | Orange-yellow, reads clearly against grey |
-| **UI elements** | Paper/cardboard tan, typewriter fonts, stamped text |
+| **UI elements** | Clean dark panels, accent colors for actions |
 | **Grid lines** | Subtle - painted lines or scored concrete |
 
 ---
 
-## Audio Direction (Future)
+## Audio Direction (Planned)
 
 - **Engine sounds** that feel mechanical, not synthetic
 - **Weapons** with punch - machine guns rattle, rockets whoosh then boom
 - **Metal impacts** - crashes should feel heavy
 - **Ambient** - arena crowd murmur, announcer echoes
-- **Music** - 80s synth? Industrial? Country-western irony? (TBD)
+- **Music** - industrial, driving, builds tension during turns
 
 ---
 
-## The Nostalgia Factor
+## Gameplay Feel
 
-Fans of classic tabletop vehicular combat remember:
+### Turn-Based Tension
 
-- Photocopying vehicle record sheets
-- Arguing about line-of-sight
-- The smell of the pocket box
-- Calculating build points by hand
+The game should create moments of:
+- **Anticipation** - "Will my drift clear that corner?"
+- **Surprise** - Physics creates unexpected outcomes
+- **Mastery** - Better scripts and timing = better results
+- **Drama** - Narrow escapes and spectacular crashes
 
-The game should occasionally wink at this:
+### Tactical Depth
 
-- Vehicle record sheets as UI elements
-- Turn phases announced like the rulebook describes them
-- Easter eggs referencing the genre
-
-### Dice Rolls (DECISION)
-
-Dice should appear during damage resolution - players love seeing the roll.
-
-**Balance:**
-- Show dice briefly during combat phase
-- Don't slow down gameplay for dice animations
-- Optional: "fast mode" skips dice visualization
-- Dice aesthetic: Classic red/white pips, maybe slightly worn
-
-The roll should feel satisfying without becoming a bottleneck.
+Players think about:
+- Vehicle positioning and facing
+- Speed management (faster = more dangerous)
+- Maneuver selection and timing
+- Script tuning for their playstyle
+- Risk vs reward on aggressive moves
 
 ---
+
+## What We're Building
+
+- A turn-based vehicular combat game
+- Physics-based movement execution
+- Player-programmable vehicle control
+- Strategic depth with emergent outcomes
+- Multiplayer arena competition
 
 ## What We're NOT Building
 
 - A Twisted Metal clone (arcade action)
 - A Crossout clone (F2P MMO grind)
-- A realistic driving sim
-- A generic post-apocalypse game
-- A mobile-first casual game
+- A realistic driving simulator
+- A mobile casual game
+- A battle royale
 
 ---
 
 ## Success Criteria
 
-The visual design succeeds if:
+The design succeeds if:
 
-1. A fan of tabletop vehicular combat sees a screenshot and feels at home
-2. A new player understands it's a tactical game, not a twitch shooter
-3. The board-game heritage is obvious but not limiting
-4. Watching a car explode feels satisfying every single time
-5. The aesthetic is distinctive enough to be recognizable
+1. A new player understands it's a tactical game, not a twitch shooter
+2. Physics creates memorable emergent moments
+3. The scripting system rewards skill and experimentation
+4. Watching a car crash feels satisfying every time
+5. The aesthetic is distinctive and professional
 
 ---
 
 ## Open Questions
 
-- [ ] How literal is the "tabletop" frame? (Table edges visible? Dice on screen?)
-- [ ] Vehicle art style: Painted miniatures vs. cardboard standees vs. stylized 3D?
 - [ ] Arena style: Indoor arena vs. outdoor lot vs. both?
 - [ ] UI: Fully diegetic (part of game world) vs. traditional overlay?
-- [ ] How much vehicle customization visible? (Paint, decals, damage wear)
+- [ ] Vehicle customization visuals: Paint, decals, damage wear?
+- [ ] Spectator mode for multiplayer matches?

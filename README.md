@@ -1,52 +1,32 @@
 # Arena Combat Engine
 
-A 3D turn-based vehicular combat engine inspired by classic tabletop games.
+A 3D turn-based vehicular combat game with real physics execution and player-programmable vehicle control scripts.
 
-## Project Status
+## Overview
 
-**Branch: `one-phase-physics-scripts`** - Major architectural pivot in progress.
+Arena Combat Engine combines the strategic depth of tabletop-style turn-based gameplay with the excitement of real physics simulation. Players declare maneuvers, then watch as physics determines the outcome - creating emergent moments where skill, preparation, and a bit of luck decide victory.
 
-This branch is transitioning from kinematic maneuver animation to **physics-based execution with Lua scripting**. See [ROADMAP.md](docs/ROADMAP.md) for details.
+**Key Features:**
+- **Turn-Based Tactics** - Plan your moves carefully; physics executes them
+- **Real Physics** - Jolt Physics engine with full drivetrain simulation
+- **Lua Scripting** - Write "Reflex Scripts" that control your vehicle during maneuvers
+- **VTT Aesthetic** - Virtual tabletop feel with 3D physics reality
 
-**This is an educational/prototype project.** It is not affiliated with, endorsed by, or connected to any commercial game or trademark holder.
+## The Vision
 
-## What This Is
-
-- A turn-based vehicular combat game with real physics execution
-- Players plan maneuvers, then physics simulates the outcome
-- **Reflex Scripts** (Lua) allow players to write adaptive control algorithms
-- Built in C++ with SDL2, OpenGL, Jolt Physics, and Lua/Sol3
-
-## What This Is NOT
-
-- A real-time arcade game (not Twisted Metal)
-- A racing simulator
-- A commercial product
-
-## The Vision: Reflex Scripts
-
-Instead of predetermined animation arcs, maneuvers are executed by **Lua scripts** that run during physics simulation:
+Instead of predetermined animation arcs, maneuvers are executed by **Lua Reflex Scripts** that run during physics simulation:
 
 ```lua
--- Example: Bootlegger Reverse script
-function update(state, dt)
-    local heading_error = angle_diff(state.heading, target_heading)
+-- Example: Traction Control Script
+function update(vehicle, dt)
+    local slip = vehicle:get_wheel_slip()
 
-    if math.abs(heading_error) > 90 then
-        -- Still rotating: full lock + e-brake
-        return {
-            steering = 1.0,
-            throttle = 0.0,
-            e_brake = true
-        }
-    else
-        -- Stabilize: counter-steer
-        return {
-            steering = clamp(-state.yaw_rate * 0.02, -1, 1),
-            throttle = 0.0,
-            brake = 0.5
-        }
+    if slip.rear_left > 0.15 or slip.rear_right > 0.15 then
+        -- Reduce throttle to prevent wheelspin
+        return { throttle = 0.5 }
     end
+
+    return { throttle = 1.0 }
 end
 ```
 
@@ -54,56 +34,107 @@ Scripts read vehicle telemetry (position, speed, slip angles) and output control
 
 ## Current Features
 
-### Physics
-- Jolt Physics engine with wheeled vehicle simulation
-- Real drivetrain: engine, gearbox, differential (in progress)
-- Tire friction and slip modeling
+### Physics Engine
+- Jolt Physics with wheeled vehicle simulation
+- Real drivetrain: engine, gearbox, differential
+- Configurable tire friction curves
 - Collision detection with arena walls and obstacles
 
+### Turn-Based Mode
+- Single maneuver per 1-second turn
+- Speed control (accelerate, hold, brake)
+- Physics-based execution with Lua scripts
+- Auto-pause when turn completes
+
+### Reflex Scripts (Lua)
+- Per-vehicle script instances
+- Hot-reload during development (F5)
+- Built-in modules: TCS, maneuver execution
+- Event system for turn-based integration
+
 ### Rendering
-- SDL2 window with OpenGL 4.x context
+- SDL2 window with OpenGL 4.x
 - Chase camera with smooth follow and mouse orbit
-- Arena with walls and obstacles
+- Arena with walls, obstacles, and ramps
 - Debug visualization for physics bodies
+- HUD with speed, RPM, throttle, and wheel slip gauges
 
-### Controls (Freestyle Mode)
-- **W/S**: Throttle / Brake
-- **A/D**: Steer left / right
-- **Space**: E-brake
-- **V**: Toggle cruise control
-- **[/]**: Cruise speed down/up
+### Controls
 
-### Camera
-- **C**: Toggle chase camera
-- **Right-click + drag**: Orbit camera
-- **Scroll**: Zoom in / out
+**Freestyle Mode:**
+- Arrow Keys: Throttle, brake, steer
+- Space: E-brake
+- V: Toggle cruise control
+- [/]: Cruise speed down/up
+- M: Toggle steering mode (analog/discrete)
 
-### General
-- **P**: Toggle physics debug visualization
-- **R**: Reload vehicle config
-- **ESC**: Quit
+**Turn-Based Mode:**
+- TAB: Enter/exit turn planning
+- Click GUI to select maneuver and speed
+- Execute button runs the turn
+
+**Camera:**
+- 1-3: Select vehicle + chase camera
+- C: Toggle chase camera
+- Middle-click + drag: Orbit camera
+- Scroll: Zoom in/out
+
+**Debug:**
+- P: Toggle physics debug visualization
+- R: Reload vehicle config
+- F5: Hot-reload scripts
+- F1: Show controls help
 
 ## Building
 
+### Requirements
+
+- CMake 3.16+
+- C++17 compiler (GCC 9+, Clang 10+, or MSVC 2019+)
+- SDL2
+- GLEW
+- Lua 5.4 (fetched automatically if not found)
+
 ### Ubuntu / Debian / WSL2
 
-Install dependencies:
-
 ```bash
+# Install dependencies
 sudo apt update
-sudo apt install build-essential cmake libsdl2-dev libglew-dev
+sudo apt install build-essential cmake libsdl2-dev libglew-dev liblua5.4-dev
+
+# Build
+cd client
+./build.sh
+
+# Run (auto-detects WSL2 GPU acceleration)
+./run.sh
 ```
 
-Jolt Physics is fetched automatically by CMake.
-
-Build and run:
+### macOS
 
 ```bash
+# Install dependencies
+brew install cmake sdl2 glew lua
+
+# Build and run
 cd client
-./build.sh        # Build the client
-./run.sh          # Run (auto-detects WSL2 GPU acceleration)
-./run.sh --build  # Build and run in one step
+./build.sh
+./run.sh
 ```
+
+### Windows (Visual Studio)
+
+```powershell
+# Install vcpkg dependencies
+vcpkg install sdl2 glew lua
+
+# Configure and build
+cd client
+cmake -B build -DCMAKE_TOOLCHAIN_FILE=[vcpkg-root]/scripts/buildsystems/vcpkg.cmake
+cmake --build build --config Release
+```
+
+Note: Jolt Physics and Sol3 (Lua bindings) are fetched automatically by CMake.
 
 ## Project Structure
 
@@ -116,47 +147,78 @@ client/                 # Game client (C++/OpenGL)
     ui/                 # UI panels and text
     platform/           # SDL2 window/input
     math/               # Vector and matrix math
-    scripts/            # Lua script engine (planned)
+    script/             # Lua Reflex Script engine
 
 assets/                 # Game assets
   data/
     vehicles/           # Vehicle JSON configs
-    equipment/          # Chassis, power plants, tires, gearboxes
+    equipment/          # Chassis, power plants, tires
   config/scenes/        # Arena definitions
   shaders/              # GLSL shaders
-  scripts/              # Lua reflex scripts (planned)
+  scripts/              # Lua Reflex Scripts
+    modules/            # Reusable script modules
 
 docs/                   # Design documents
   proposals/            # Architecture proposals
   ROADMAP.md            # Development status
   CONFIG_GUIDE.md       # Configuration reference
 
-server/                 # Game server (Go) - planned
+server/                 # Game server (planned)
 ```
 
 ## Documentation
 
 - [ROADMAP.md](docs/ROADMAP.md) - Development status and planned features
-- [CONFIG_GUIDE.md](docs/CONFIG_GUIDE.md) - Vehicle and physics configuration
-- [Physics-Based Turn System](docs/proposals/physics-based-turn-system.md) - Architecture proposal
-- [Maneuver Scripting System](docs/proposals/maneuver-scripting-system.md) - Reflex Scripts proposal
+- [CONFIG_GUIDE.md](docs/CONFIG_GUIDE.md) - Vehicle and physics configuration reference
+- [vision.md](docs/vision.md) - Visual and gameplay design direction
 
-## Development Phases
+## Scripting System
 
-1. **Cleanup** - Remove kinematic system, disable turn mode (current)
-2. **Physics Restoration** - Real drivetrain, remove linear force hack
-3. **Lua Integration** - Sol3, telemetry API, control API
-4. **Script Lifecycle** - Always-on scripts, hot reload
-5. **Automated Testing** - Script-based physics tests
-6. **Maneuver System** - Goal-based scripts with success/failure detection
-7. **UI/Editor** - Maneuver workshop, script editor
-8. **Combat** - Weapons, damage, armor
-9. **Multiplayer** - Network sync, script sharing
+Vehicles can have multiple Lua scripts attached that run during physics simulation:
+
+**Built-in Scripts:**
+- `tcs.lua` - Traction Control System (prevents wheelspin)
+- `maneuver.lua` - Turn-based maneuver execution
+
+**Script API:**
+```lua
+-- Read vehicle state
+local speed = vehicle:get_speed()           -- mph
+local slip = vehicle:get_wheel_slip()       -- per-wheel slip ratios
+local heading = vehicle:get_heading()       -- degrees
+
+-- Output controls (merged with other scripts)
+return {
+    throttle = 0.8,     -- 0.0 to 1.0
+    brake = 0.0,        -- 0.0 to 1.0
+    steering = 0.0,     -- -1.0 to 1.0
+}
+```
+
+Scripts are configured per-vehicle in JSON:
+```json
+{
+    "scripts": [
+        {
+            "name": "tcs",
+            "path": "scripts/modules/tcs.lua",
+            "enabled": true,
+            "options": {
+                "slip_threshold": 0.12,
+                "reduction_rate": 0.7
+            }
+        }
+    ]
+}
+```
 
 ## License
 
+This project uses a dual licensing model:
+
+- **Client (this repository)**: Open source under the MIT License
+- **Server and Network Components**: Proprietary (not included in this repository)
+
 See [LICENSE](LICENSE) for details.
 
-## Disclaimer
-
-This is an independent project created for educational and personal use. It is inspired by classic tabletop vehicular combat games but is not affiliated with or endorsed by any game publisher.
+The open-source client can connect to official game servers or be used for local single-player and LAN play.

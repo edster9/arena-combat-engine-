@@ -1,6 +1,15 @@
+# Arena Combat Engine - License
+
+This project uses a dual licensing model.
+
+## Client (Open Source)
+
+The game client code in this repository is licensed under the MIT License:
+
+```
 MIT License
 
-Copyright (c) 2024 Ed Sahakian
+Copyright (c) 2024-2025 Ed Sahakian
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,16 +28,28 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+```
 
----
+## Server and Network Components (Proprietary)
 
-DISCLAIMER
+The game server, matchmaking services, and certain network synchronization
+libraries are proprietary and not included in this repository. These components
+are required for online multiplayer but not for local play.
 
-This is an educational/learning project. Any references to existing games,
-trademarks, or intellectual property are for inspiration and learning purposes
-only. This project is not affiliated with, endorsed by, or connected to any
-commercial game publisher or trademark holder.
+The open-source client includes:
+- Full single-player functionality
+- Local multiplayer (same machine)
+- LAN play capabilities
+- All gameplay mechanics and physics
 
-Third-party assets (3D models, textures, etc.) are used under their respective
-licenses (primarily CC0/Public Domain). See individual asset directories for
-license details.
+## Third-Party Assets
+
+Third-party assets (3D models, textures, fonts, etc.) are used under their
+respective licenses. See individual asset directories for license details.
+
+Most assets are CC0/Public Domain or similarly permissively licensed.
+
+## Contributions
+
+By contributing to this repository, you agree that your contributions will be
+licensed under the MIT License as described above.

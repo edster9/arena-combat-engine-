@@ -101,11 +101,12 @@ void reflex_destroy(ReflexScriptEngine* engine) {
 
 bool reflex_attach_script(ReflexScriptEngine* engine,
                           int vehicle_id,
+                          const char* script_name,
                           const char* script_path,
                           const char* config_keys[],
                           float config_values[],
                           int config_count) {
-    if (!engine || !engine->valid || !script_path) return false;
+    if (!engine || !engine->valid || !script_name || !script_path) return false;
 
     // Build config table
     sol::table config = engine->lua.create_table();
@@ -119,9 +120,9 @@ bool reflex_attach_script(ReflexScriptEngine* engine,
     char full_path[512];
     snprintf(full_path, sizeof(full_path), "../../assets/%s", script_path);
 
-    // Call master.attach_script(vehicle_id, script_path, config)
+    // Call master.attach_script(vehicle_id, script_name, script_path, config)
     sol::protected_function attach_fn = engine->master["attach_script"];
-    sol::protected_function_result result = attach_fn(vehicle_id, full_path, config);
+    sol::protected_function_result result = attach_fn(vehicle_id, script_name, full_path, config);
 
     if (!result.valid()) {
         sol::error err = result;
@@ -133,15 +134,27 @@ bool reflex_attach_script(ReflexScriptEngine* engine,
     return success;
 }
 
-void reflex_detach_script(ReflexScriptEngine* engine, int vehicle_id) {
-    if (!engine || !engine->valid) return;
+void reflex_detach_script(ReflexScriptEngine* engine, int vehicle_id, const char* script_name) {
+    if (!engine || !engine->valid || !script_name) return;
 
     sol::protected_function detach_fn = engine->master["detach_script"];
-    sol::protected_function_result result = detach_fn(vehicle_id);
+    sol::protected_function_result result = detach_fn(vehicle_id, script_name);
 
     if (!result.valid()) {
         sol::error err = result;
         std::cerr << "[Reflex] detach_script error: " << err.what() << std::endl;
+    }
+}
+
+void reflex_detach_all(ReflexScriptEngine* engine, int vehicle_id) {
+    if (!engine || !engine->valid) return;
+
+    sol::protected_function detach_fn = engine->master["detach_all"];
+    sol::protected_function_result result = detach_fn(vehicle_id);
+
+    if (!result.valid()) {
+        sol::error err = result;
+        std::cerr << "[Reflex] detach_all error: " << err.what() << std::endl;
     }
 }
 
@@ -303,6 +316,254 @@ int reflex_reload_all_scripts(ReflexScriptEngine* engine) {
 
     int count = result.get<int>();
     return count;
+}
+
+// ============================================================================
+// Turn-Based Maneuver Control
+// ============================================================================
+
+// Static storage for result strings (to return const char* safely)
+static char s_result_level[32] = "pending";
+
+bool reflex_start_turn(ReflexScriptEngine* engine,
+                       int vehicle_id,
+                       const char* maneuver_type,
+                       const char* direction,
+                       float duration) {
+    if (!engine || !engine->valid) return false;
+
+    // Call the vehicle's start_turn function via master
+    // First, we need to get the vehicle's script environment
+    // The turn_executor script exposes start_turn() as a global function
+
+    // Build options table
+    sol::table options = engine->lua.create_table();
+    options["duration"] = duration;
+
+    // Call: start_turn(ctx, maneuver_type, direction, options)
+    // We need to build a minimal ctx with telemetry
+    // For now, call a master function that dispatches to the right vehicle
+
+    // Add a start_turn function to master that we can call
+    sol::protected_function start_fn = engine->master["start_turn"];
+    if (!start_fn.valid()) {
+        // Master doesn't have start_turn yet - we need to add it
+        // For now, try calling the vehicle's script directly
+        std::cerr << "[Reflex] master.start_turn not implemented yet" << std::endl;
+        return false;
+    }
+
+    sol::protected_function_result result = start_fn(vehicle_id, maneuver_type, direction, options);
+    if (!result.valid()) {
+        sol::error err = result;
+        std::cerr << "[Reflex] start_turn error: " << err.what() << std::endl;
+        return false;
+    }
+
+    return result.get<bool>();
+}
+
+ManeuverResult reflex_end_turn(ReflexScriptEngine* engine, int vehicle_id) {
+    ManeuverResult result = {};
+    result.success = false;
+    result.level = "failed";
+    result.heading_error = 999.0f;
+
+    if (!engine || !engine->valid) return result;
+
+    sol::protected_function end_fn = engine->master["end_turn"];
+    if (!end_fn.valid()) {
+        std::cerr << "[Reflex] master.end_turn not implemented yet" << std::endl;
+        return result;
+    }
+
+    sol::protected_function_result lua_result = end_fn(vehicle_id);
+    if (!lua_result.valid()) {
+        sol::error err = lua_result;
+        std::cerr << "[Reflex] end_turn error: " << err.what() << std::endl;
+        return result;
+    }
+
+    // Parse the result table from Lua
+    sol::table res_table = lua_result;
+    if (res_table.valid()) {
+        result.success = res_table.get_or("success", false);
+
+        std::string level = res_table.get_or<std::string>("level", "failed");
+        strncpy(s_result_level, level.c_str(), sizeof(s_result_level) - 1);
+        result.level = s_result_level;
+
+        result.heading_error = res_table.get_or("heading_error", 999.0f);
+        result.position_error = res_table.get_or("position_error", 999.0f);
+        result.heading_achieved = res_table.get_or("heading_delta_achieved", 0.0f);
+        result.heading_target = res_table.get_or("target_heading_delta", 0.0f);
+    }
+
+    return result;
+}
+
+bool reflex_is_turn_active(ReflexScriptEngine* engine, int vehicle_id) {
+    if (!engine || !engine->valid) return false;
+
+    sol::protected_function active_fn = engine->master["is_turn_active"];
+    if (!active_fn.valid()) {
+        return false;
+    }
+
+    sol::protected_function_result result = active_fn(vehicle_id);
+    if (!result.valid()) {
+        return false;
+    }
+
+    return result.get<bool>();
+}
+
+// ============================================================================
+// Test Sequence Control
+// ============================================================================
+
+bool reflex_start_test_sequence(ReflexScriptEngine* engine,
+                                 int vehicle_id,
+                                 const char* sequence_name) {
+    if (!engine || !engine->valid) return false;
+
+    sol::protected_function start_fn = engine->master["start_test_sequence"];
+    if (!start_fn.valid()) {
+        std::cerr << "[Reflex] master.start_test_sequence not found" << std::endl;
+        return false;
+    }
+
+    sol::protected_function_result result = start_fn(vehicle_id, sequence_name);
+    if (!result.valid()) {
+        sol::error err = result;
+        std::cerr << "[Reflex] start_test_sequence error: " << err.what() << std::endl;
+        return false;
+    }
+
+    return result.get<bool>();
+}
+
+void reflex_stop_test_sequence(ReflexScriptEngine* engine) {
+    if (!engine || !engine->valid) return;
+
+    sol::protected_function stop_fn = engine->master["stop_test_sequence"];
+    if (!stop_fn.valid()) return;
+
+    stop_fn();
+}
+
+bool reflex_is_test_running(ReflexScriptEngine* engine) {
+    if (!engine || !engine->valid) return false;
+
+    sol::protected_function is_running_fn = engine->master["is_test_running"];
+    if (!is_running_fn.valid()) return false;
+
+    sol::protected_function_result result = is_running_fn();
+    if (!result.valid()) return false;
+
+    return result.get<bool>();
+}
+
+// ============================================================================
+// Input Handling
+// ============================================================================
+
+void reflex_on_input(ReflexScriptEngine* engine,
+                     const bool* keys_pressed,
+                     int key_count,
+                     int selected_vehicle_id) {
+    if (!engine || !engine->valid || !keys_pressed) return;
+
+    // Build table of pressed keys (only include keys that are actually pressed)
+    sol::table pressed = engine->lua.create_table();
+    int count = 0;
+    for (int k = 0; k < key_count; k++) {
+        if (keys_pressed[k]) {
+            pressed[k] = true;
+            count++;
+        }
+    }
+
+    // Early exit if no keys pressed
+    if (count == 0) return;
+
+    // Call master.on_input(keys_pressed, selected_vehicle_id)
+    sol::protected_function on_input_fn = engine->master["on_input"];
+    if (!on_input_fn.valid()) {
+        // master.on_input not implemented yet - silent fail
+        return;
+    }
+
+    sol::protected_function_result result = on_input_fn(pressed, selected_vehicle_id);
+    if (!result.valid()) {
+        sol::error err = result;
+        std::cerr << "[Reflex] on_input error: " << err.what() << std::endl;
+    }
+}
+
+// ============================================================================
+// Event System
+// ============================================================================
+
+ScriptEventData reflex_event_data_create(void) {
+    ScriptEventData data;
+    data.count = 0;
+    for (int i = 0; i < 16; i++) {
+        data.keys[i] = nullptr;
+        data.values[i] = 0.0f;
+        data.strings[i] = nullptr;
+    }
+    return data;
+}
+
+void reflex_event_data_add_float(ScriptEventData* data, const char* key, float value) {
+    if (!data || data->count >= 16) return;
+    int i = data->count++;
+    data->keys[i] = key;
+    data->values[i] = value;
+    data->strings[i] = nullptr;
+}
+
+void reflex_event_data_add_string(ScriptEventData* data, const char* key, const char* value) {
+    if (!data || data->count >= 16) return;
+    int i = data->count++;
+    data->keys[i] = key;
+    data->values[i] = 0.0f;
+    data->strings[i] = value;
+}
+
+void reflex_send_event(ReflexScriptEngine* engine,
+                       int vehicle_id,
+                       const char* event_name,
+                       const ScriptEventData* data) {
+    if (!engine || !engine->valid || !event_name) return;
+
+    // Build data table from ScriptEventData
+    sol::table event_data = engine->lua.create_table();
+    if (data) {
+        for (int i = 0; i < data->count; i++) {
+            if (data->keys[i]) {
+                if (data->strings[i]) {
+                    event_data[data->keys[i]] = data->strings[i];
+                } else {
+                    event_data[data->keys[i]] = data->values[i];
+                }
+            }
+        }
+    }
+
+    // Call master.on_event(vehicle_id, event_name, data)
+    sol::protected_function on_event_fn = engine->master["on_event"];
+    if (!on_event_fn.valid()) {
+        // master.on_event not implemented yet - silent fail
+        return;
+    }
+
+    sol::protected_function_result result = on_event_fn(vehicle_id, event_name, event_data);
+    if (!result.valid()) {
+        sol::error err = result;
+        std::cerr << "[Reflex] on_event error: " << err.what() << std::endl;
+    }
 }
 
 } // extern "C"

@@ -1,234 +1,143 @@
 # Arena Combat Engine - Development Roadmap
 
-## Current Status (2025-12-31)
+## Current Status
 
-**Branch: `one-phase-physics-scripts`**
+**Version: 0.1.0-alpha** (January 2025)
 
-This branch represents a major architectural pivot from kinematic maneuver animation to physics-based execution with Lua scripting ("Reflex Scripts"). If successful, this will replace `main`.
-
-### The Pivot: Why We're Changing
-
-The previous approach used:
-- **5-phase turns** - A tabletop board game convenience, not physics-realistic
-- **Kinematic animation** - Predetermined arcs that ignore physics variance
-- **Open-loop control** - Pre-recorded inputs that fail when physics diverges
-
-The new approach:
-- **Single-phase turns** - One maneuver per 1-second turn, physics-realistic
-- **Real physics execution** - Actual drivetrain simulation (engine, gearbox, tires)
-- **Closed-loop Reflex Scripts** - Lua scripts that adapt to physics in real-time
-
-See [physics-based-turn-system.md](proposals/physics-based-turn-system.md) and [maneuver-scripting-system.md](proposals/maneuver-scripting-system.md) for full proposals.
+The engine has achieved its core architectural goals: physics-based turn execution with Lua scripting. The foundation is solid and ready for gameplay feature development.
 
 ---
 
-## Phase 1: Cleanup - IN PROGRESS
+## Completed Features
 
-### Tear Down Cinematic System
-- [ ] Disable turn-based mode (flag off, keep code for reference)
-- [ ] Remove 5-phase system completely
-- [ ] Remove kinematic maneuver execution
-- [ ] Clean up handling.cpp/h (archive for potential hybrid mode later)
-- [ ] Remove ghost path preview (will rebuild with new system)
+### Physics Foundation
+- [x] Jolt Physics integration with wheeled vehicles
+- [x] Real drivetrain simulation (engine, gearbox, differential)
+- [x] Configurable tire friction curves
+- [x] Suspension tuning (frequency, damping, travel)
+- [x] Arena with walls, obstacles, and ramps
+- [x] Cruise control system
 
-### Documentation
-- [x] Create proposal documents
-- [x] Update ROADMAP.md
-- [ ] Update README.md
-
----
-
-## Phase 2: Physics Restoration
-
-### Transmission System
-- [ ] Merge gearbox system from `engine-based-physics` branch
-- [ ] Merge drivetrain (gear ratios, differential, shift logic)
-- [ ] Remove `use_linear_accel` mode (no more fake constant force)
-- [ ] Enable real engine torque curves
-
-### Physics Tuning
-- [ ] Get vehicle driving naturally in freestyle mode
-- [ ] Tune tire friction for realistic handling
-- [ ] Tune suspension for stability
-- [ ] Validate acceleration matches target (10 mph/s class system)
-- [ ] Test at various speeds (10, 30, 60 mph)
-
----
-
-## Phase 3: Lua/Sol3 Integration
-
-### Core Integration
-- [ ] Add Sol3 dependency to CMake (header-only)
-- [ ] Use LuaJIT backend for 2-10x performance over standard Lua
-- [ ] Create `ReflexScriptEngine` class
-- [ ] Implement sandbox environment (whitelist safe functions)
-- [ ] Add execution time limits (kill runaway scripts)
-
-**Why LuaJIT:**
-- Drop-in replacement for Lua 5.1
-- 2-10x faster execution (critical for 15 Hz script updates)
-- Sol3 supports both standard Lua and LuaJIT
-- Battle-tested in games (World of Warcraft, Garry's Mod, etc.)
-
-### Telemetry API (Script Inputs)
-```lua
-state = {
-    position = {x, y, z},
-    heading = 0.0,           -- degrees
-    speed = 0.0,             -- mph
-    velocity = {x, y, z},
-    yaw_rate = 0.0,          -- degrees/second
-    slip_angle = {fl, fr, rl, rr},
-    slip_ratio = {fl, fr, rl, rr},
-    tire_load = {fl, fr, rl, rr},
-    is_grounded = true,
-    time_elapsed = 0.0,
-    -- ... more
-}
-```
-
-### Control API (Script Outputs)
-```lua
-controls = {
-    steering = 0.0,      -- -1.0 to +1.0
-    throttle = 0.0,      -- 0.0 to 1.0
-    brake = 0.0,         -- 0.0 to 1.0
-    e_brake = false,     -- true/false
-}
-```
-
-### Helper Functions
-- [ ] `clamp(value, min, max)`
-- [ ] `lerp(a, b, t)`
-- [ ] `normalize_angle(degrees)`
-- [ ] `angle_diff(a, b)`
-- [ ] `pid_controller(kp, ki, kd)` - PID helper object
-
----
-
-## Phase 4: Script Lifecycle
-
-### Always-On Execution
-Scripts run continuously, not just during maneuvers. This enables:
-- Traction control
-- Stability control
-- Autopilot / AI driving
-- Automated testing
-
-### Script Management
-- [ ] Script loading from files
-- [ ] Hot-reload support (edit and test without restart)
-- [ ] Per-vehicle script contexts (isolated Lua states)
-- [ ] Error handling and logging
+### Lua Scripting System ("Reflex Scripts")
+- [x] Sol3 integration for C++/Lua binding
+- [x] Per-vehicle script instances with isolated state
+- [x] Hot-reload support (F5 key)
+- [x] Vehicle telemetry API (speed, heading, wheel slip)
+- [x] Control output API (throttle, brake, steering)
+- [x] Event system for C++ to Lua communication
+- [x] Script configuration in vehicle JSON
 
 ### Built-in Scripts
-- [ ] Traction Control System (TCS) - prevent wheel spin
-- [ ] Stability Control (ESC) - prevent spins
-- [ ] Simple Autopilot - drive straight, maintain speed
+- [x] Traction Control System (TCS) - slip-based throttle reduction
+- [x] Maneuver Module - turn-based maneuver execution
+  - Straight, Drift, Steep Drift, Bend, Swerve
+  - Speed change integration (accelerate, hold, brake)
+
+### Turn-Based Mode
+- [x] Single maneuver per 1-second turn
+- [x] GUI for maneuver and speed selection
+- [x] Physics execution with auto-pause on completion
+- [x] Speed snapshotting at pause
+
+### Rendering & UI
+- [x] SDL2/OpenGL 4.x renderer
+- [x] Chase camera with orbit controls
+- [x] Turn planning GUI panel
+- [x] HUD gauges (speed, RPM, throttle, slip)
+- [x] Debug visualization (physics bodies, wheels)
 
 ---
 
-## Phase 5: Automated Testing Framework
+## In Progress
 
-Use the script system to write automated tests:
-- [ ] Acceleration tests (0-60 time validation)
-- [ ] Braking tests (60-0 distance)
-- [ ] Handling tests (slalom, lane change)
-- [ ] Stress tests (random inputs, find edge cases)
+### Turn-Based Refinement
+- [ ] Ghost path preview for planned maneuvers
+- [ ] Maneuver success/failure detection
+- [ ] Handling Status system (optional arcade mode)
 
----
-
-## Phase 6: Maneuver System
-
-### Maneuver Definition
-```lua
-maneuver = {
-    name = "Bootlegger Reverse",
-    entry_speed = {min = 20, max = 35},  -- mph
-    goal = {
-        heading_change = 180,  -- degrees
-        heading_tolerance = 15,
-        max_final_speed = 5,   -- mph
-    },
-    script = "bootlegger.lua",
-}
-```
-
-### Script Callbacks
-- [ ] `init(goal)` - called once when maneuver starts
-- [ ] `update(state, dt)` - called at 15 Hz, returns controls
-- [ ] `is_complete(state)` - check success
-- [ ] `is_failed(state)` - check failure
-
-### Maneuver Templates
-- [ ] STRAIGHT - no steering, maintain throttle
-- [ ] DRIFT - slight constant steering angle
-- [ ] BEND - steering proportional to desired angle
-- [ ] BOOTLEGGER - full script with phases
-- [ ] T_STOP - emergency brake with steering
-- [ ] CONTROLLED_SKID - powerslide control
+### Physics Tuning
+- [ ] Per-vehicle friction curve tuning
+- [ ] Improved suspension presets
+- [ ] Weight transfer visualization
 
 ---
 
-## Phase 7: UI and Editor
+## Upcoming Features
 
-### Maneuver Workshop
-- [ ] Timeline-based script visualizer
-- [ ] Test run functionality
-- [ ] Success rate tracking
-- [ ] Save/load profiles
+### Phase 1: Combat System
+- [ ] Weapon mounting points
+- [ ] Projectile physics
+- [ ] Damage model (armor, components)
+- [ ] Fire and explosion effects
 
-### Script Editor (Future)
-- [ ] In-game code editor with syntax highlighting
-- [ ] Console output for debugging
-- [ ] Visual scripting option (node-based)
+### Phase 2: Advanced Maneuvers
+- [ ] Bootlegger reverse
+- [ ] T-stop
+- [ ] Controlled skid
+- [ ] Pivot turn
+- [ ] Player-tunable maneuver profiles
+
+### Phase 3: AI & Automation
+- [ ] Basic AI driver scripts
+- [ ] Pathfinding for AI
+- [ ] Automated testing framework
+
+### Phase 4: Multiplayer
+- [ ] Turn synchronization protocol
+- [ ] Server authority model
+- [ ] Script sharing/validation
+- [ ] Lobby and matchmaking
+
+### Phase 5: Polish
+- [ ] Sound effects
+- [ ] Particle systems
+- [ ] Vehicle damage visuals
+- [ ] In-game script editor
 
 ---
 
-## Phase 8: Combat System
-
-(Unchanged from previous roadmap)
-- [ ] Weapon mounting and firing
-- [ ] Damage resolution
-- [ ] Armor and components
-
----
-
-## Phase 9: Multiplayer
-
-(Unchanged, but now easier with turn-based sync points)
-- [ ] Network architecture
-- [ ] Turn synchronization
-- [ ] Script sharing (pre-match upload)
-
----
-
-## Technical Architecture (New)
+## Technical Architecture
 
 ### Physics Layer
-- **Jolt Physics** for rigid body simulation
-- **Real drivetrain** - engine, gearbox, differential, wheels
-- **Tire model** - slip angles, grip limits
-- **No kinematic hacks** - physics determines outcomes
+- **Jolt Physics** - Rigid body simulation, vehicle constraints
+- **Real drivetrain** - Engine torque, gear ratios, differential
+- **Tire model** - Slip angles, longitudinal slip, grip limits
 
 ### Script Layer
-- **Lua via Sol3** - fast, sandboxed scripting
-- **15 Hz update rate** - scripts run every 66ms
-- **Closed-loop control** - scripts read state, output corrections
-- **Per-vehicle contexts** - isolated Lua states
+- **Lua via Sol3** - Fast, sandboxed scripting
+- **Per-vehicle contexts** - Isolated Lua states per vehicle
+- **Event-driven** - C++ sends events, Lua responds with controls
 
 ### Game Logic
-- **Single-phase turns** - one maneuver per 1-second turn
-- **Simultaneous declaration** - all players declare, then execute
-- **Physics-determined outcomes** - no dice rolls, physics decides
-- **Optional Handling Status** - hybrid mode for tabletop feel
+- **Single-phase turns** - One maneuver per 1-second turn
+- **Physics-determined outcomes** - No dice rolls, physics decides
+- **Hybrid mode** - Optional Handling Status for arcade feel
+
+---
+
+## Design Principles
+
+1. **Physics First** - All movement comes from physics simulation
+2. **Scripts Adapt** - Lua scripts provide closed-loop control
+3. **Emergent Outcomes** - Results emerge from physics, not animation
+4. **Accessible Depth** - Simple to play, deep to master
+5. **VTT Feel** - Virtual tabletop aesthetic, 3D physics reality
+
+---
+
+## Contributing
+
+See the main README for build instructions. Key areas welcoming contribution:
+
+- Maneuver script implementations
+- Physics tuning and vehicle configs
+- UI/UX improvements
+- Documentation
 
 ---
 
 ## References
 
-- [Physics-Based Turn System Proposal](proposals/physics-based-turn-system.md)
-- [Maneuver Scripting System Proposal](proposals/maneuver-scripting-system.md)
-- Jolt Physics documentation
-- Sol3 (Lua C++ bindings) documentation
-- Classic tabletop vehicular combat rules
+- [CONFIG_GUIDE.md](CONFIG_GUIDE.md) - Vehicle and physics configuration
+- [vision.md](vision.md) - Visual and gameplay design direction
+- [proposals/](proposals/) - Original design proposals (historical reference)

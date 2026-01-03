@@ -388,8 +388,9 @@ void physics_step(PhysicsWorld* pw, float dt)
                 fflush(stdout);
             }
 
-            // Apply cruise control if enabled and no manual input
-            if (v->cruise_enabled && forward == 0.0f) {
+            // Apply cruise control if enabled and no manual throttle input
+            // Check raw throttle (not forward) to allow cruise when player isn't pressing gas
+            if (v->cruise_enabled && v->throttle == 0.0f && v->reverse == 0.0f) {
                 JPH::Vec3 vel = bodyInterface.GetLinearVelocity(vimpl->bodyId);
                 float speed = vel.Length();
                 float target = v->cruise_target_ms;
@@ -398,16 +399,21 @@ void physics_step(PhysicsWorld* pw, float dt)
                 float speedDiff = target - speed;
                 const float tolerance = 0.1f;  // m/s tolerance (~0.2 mph) - tight for accuracy
 
+                float cruiseThrottle = 0.0f;
                 if (speedDiff > tolerance) {
                     // Need to accelerate - proportional throttle with minimum
-                    forward = fminf(speedDiff / 3.0f + 0.1f, 1.0f);  // More aggressive + minimum
+                    cruiseThrottle = fminf(speedDiff / 3.0f + 0.1f, 1.0f);  // More aggressive + minimum
                 } else if (speedDiff < -tolerance) {
                     // Need to slow down - coast (friction will handle it)
-                    forward = 0.0f;
+                    cruiseThrottle = 0.0f;
                 } else {
                     // Within tolerance - apply tiny maintenance force to overcome rolling resistance
-                    forward = 0.05f;
+                    cruiseThrottle = 0.05f;
                 }
+
+                // Set both forward (for matchbox mode) and v->throttle (for drivetrain mode)
+                forward = cruiseThrottle;
+                v->throttle = cruiseThrottle;
             }
             // ========== END CRUISE CONTROL ==========
 

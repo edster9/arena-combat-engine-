@@ -1,8 +1,12 @@
 # Proposal: Maneuver Scripting System ("Reflex Scripts")
 
 **Date:** 2025-12-31
-**Status:** Draft for Discussion
+**Status:** IMPLEMENTED (January 2025)
 **Builds On:** [Physics-Based Turn System](physics-based-turn-system.md)
+
+> **Note:** This proposal has been implemented. Lua Reflex Scripts are now integrated
+> via Sol3, with per-vehicle instances, hot-reload support, and event-driven
+> communication. This document is preserved as a historical reference.
 
 ## Executive Summary
 

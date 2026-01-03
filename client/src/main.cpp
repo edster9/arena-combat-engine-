@@ -9,12 +9,12 @@
  */
 
 // ============================================================================
-// TURN-BASED SYSTEM: DISABLED
-// The kinematic 5-phase turn system is disabled while we implement
-// physics-based execution with Reflex Scripts (Lua).
-// Set to 1 to re-enable legacy turn mode (not recommended).
+// TURN-BASED SYSTEM: ENABLED
+// Turn-based mode uses physics pause + Lua script execution.
+// GUI maneuver declaration sends events to scripts for execution.
+// Set to 0 for freestyle-only mode.
 // ============================================================================
-#define TURN_MODE_ENABLED 0
+#define TURN_MODE_ENABLED 1
 
 #include "platform/platform.h"
 #include "math/vec3.h"
@@ -70,17 +70,19 @@ typedef enum {
 
 typedef struct {
     SpeedChoice speed_choice;
-    int selected_phase;      // 0-4, which phase box is selected
     int current_speed;       // Current speed in mph (display only)
 
     // Snapshot speed when paused (for phase calculation)
-    int snapshot_speed;      // Speed at moment of pause - determines phases
-    int active_phases_mask;  // Bitmask of which phases are active (calculated once on pause)
+    int snapshot_speed;      // Speed at moment of pause
 
-    // Declared maneuver for each phase (default: MANEUVER_NONE = straight)
-    ManeuverType phase_maneuver[5];       // What maneuver for each phase
-    ManeuverDirection phase_direction[5]; // Direction for each phase
-    int phase_bend_angle[5];              // Bend angle (15,30,45,60,75,90)
+    // Declared maneuver for this turn (default: MANEUVER_NONE = straight)
+    ManeuverType maneuver;            // What maneuver for this turn
+    ManeuverDirection direction;      // Direction (left/right)
+    int bend_angle;                   // Bend angle (15,30,45)
+
+    // Turn execution tracking
+    bool turn_executing;              // True while a turn is being executed
+    int turn_vehicle_id;              // Vehicle ID for the executing turn
 } PlanningState;
 
 // Physics state for freestyle mode
@@ -144,6 +146,32 @@ static int get_active_phases(int speed_mph) {
 static bool point_in_rect(float px, float py, UIRect rect) {
     return px >= rect.x && px <= rect.x + rect.width &&
            py >= rect.y && py <= rect.y + rect.height;
+}
+
+// Convert ManeuverType to script-compatible name (for Lua maneuver module)
+static const char* maneuver_to_script_name(ManeuverType type, int bend_angle) {
+    switch (type) {
+        case MANEUVER_NONE:
+        case MANEUVER_STRAIGHT: return "straight";
+        case MANEUVER_DRIFT: return "drift";
+        case MANEUVER_STEEP_DRIFT: return "steep_drift";
+        case MANEUVER_BEND:
+            switch (bend_angle) {
+                case 15: return "bend_15";
+                case 30: return "bend_30";
+                case 45: return "bend_45";
+                case 60: return "bend_60";
+                case 75: return "bend_75";
+                case 90: return "bend_90";
+                default: return "bend_45";
+            }
+        case MANEUVER_SWERVE: return "swerve";
+        case MANEUVER_CONTROLLED_SKID: return "controlled_skid";
+        case MANEUVER_T_STOP: return "t_stop";
+        case MANEUVER_PIVOT: return "pivot";
+        case MANEUVER_BOOTLEGGER: return "bootlegger";
+        default: return "straight";
+    }
 }
 
 // Draw arena walls using config
@@ -565,7 +593,7 @@ int main(int argc, char* argv[]) {
                         }
 
                         // Attach script with config (creates isolated instance for this vehicle)
-                        reflex_attach_script(script_engine, phys_id, vs->path,
+                        reflex_attach_script(script_engine, phys_id, vs->name, vs->path,
                                              keys, values, vs->option_count);
                     }
                 }
@@ -609,13 +637,13 @@ int main(int argc, char* argv[]) {
     // Planning state
     PlanningState planning = {
         .speed_choice = SPEED_HOLD,
-        .selected_phase = 0,
         .current_speed = 0,  // Starting from standstill
         .snapshot_speed = 0,
-        .active_phases_mask = 0,
-        .phase_maneuver = {MANEUVER_NONE, MANEUVER_NONE, MANEUVER_NONE, MANEUVER_NONE, MANEUVER_NONE},
-        .phase_direction = {MANEUVER_LEFT, MANEUVER_LEFT, MANEUVER_LEFT, MANEUVER_LEFT, MANEUVER_LEFT},
-        .phase_bend_angle = {0, 0, 0, 0, 0}
+        .maneuver = MANEUVER_NONE,
+        .direction = MANEUVER_LEFT,
+        .bend_angle = 0,
+        .turn_executing = false,
+        .turn_vehicle_id = -1
     };
 
     // Debug flags
@@ -634,6 +662,17 @@ int main(int argc, char* argv[]) {
     // - physics.paused = true  → Turn Based mode
     // - physics.paused = false → Freestyle mode
     // Toggle with TAB key (F key removed)
+
+    // Scripted turn state (physics-based maneuver execution via Lua scripts)
+    // When active, scripts apply controls to achieve maneuver goals over 1 second
+    struct {
+        bool active;              // Is a scripted turn in progress?
+        int vehicle_id;           // Which vehicle is executing the turn
+        float elapsed;            // Time elapsed in turn (0 to 1.0)
+        float duration;           // Turn duration (always 1.0s)
+        const char* maneuver;     // Current maneuver type name
+        const char* direction;    // "left", "right", or "center"
+    } scripted_turn = {false, -1, 0.0f, 1.0f, nullptr, nullptr};
 
     // Steering state (accessible for status bar display)
     bool discrete_steering = false;  // Start in gradual mode (easier to drive)
@@ -890,6 +929,16 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        // Pass input to scripts (X, Y handled in Lua now)
+        {
+            Entity* sel = entity_manager_get_selected(&entities);
+            int selected_vehicle_id = -1;
+            if (sel && sel->id < MAX_ENTITIES && entity_to_physics[sel->id] >= 0) {
+                selected_vehicle_id = entity_to_physics[sel->id];
+            }
+            reflex_on_input(script_engine, input.keys_pressed, 512, selected_vehicle_id);
+        }
+
         // Cruise control: V = toggle cruise (hold current speed or cancel)
         if (input.keys_pressed[KEY_V]) {
             Entity* sel = entity_manager_get_selected(&entities);
@@ -951,31 +1000,13 @@ int main(int argc, char* argv[]) {
                     float vel_ms = 0.0f;
                     physics_vehicle_get_velocity(&physics, pause_phys_id, &vel_ms);
                     planning.snapshot_speed = (int)(fabsf(vel_ms) * 2.237f);  // m/s to mph
-                    planning.active_phases_mask = get_active_phases(planning.snapshot_speed);
 
-                    // Reset maneuvers to NONE (straight) for new turn
-                    for (int i = 0; i < 5; i++) {
-                        planning.phase_maneuver[i] = MANEUVER_NONE;
-                        planning.phase_direction[i] = MANEUVER_LEFT;  // Default, will be set when maneuver chosen
-                        planning.phase_bend_angle[i] = 0;
-                    }
+                    // Reset maneuver for new turn
+                    planning.maneuver = MANEUVER_NONE;
+                    planning.direction = MANEUVER_LEFT;
+                    planning.bend_angle = 0;
 
-                    // Auto-select first active phase
-                    planning.selected_phase = -1;  // None selected initially
-                    for (int i = 0; i < 5; i++) {
-                        if ((planning.active_phases_mask >> i) & 1) {
-                            planning.selected_phase = i;
-                            break;
-                        }
-                    }
-
-                    // At 0 mph, force ACCEL (only option when starting from stop)
-                    if (planning.snapshot_speed < 5) {
-                        planning.speed_choice = SPEED_ACCEL;
-                    }
-
-                    printf("[Turn] Paused at %d mph - phases: 0x%02X\n",
-                           planning.snapshot_speed, planning.active_phases_mask);
+                    printf("[Turn] Paused at %d mph\n", planning.snapshot_speed);
                 }
             }
         }
@@ -1003,14 +1034,11 @@ int main(int argc, char* argv[]) {
             UIRect hold_btn = ui_rect(platform.width - 210, 100, 80, 50);
             UIRect accel_btn = ui_rect(platform.width - 115, 100, 80, 50);
 
-            // At 0 mph, only ACCEL is allowed (can't brake or hold at stop)
-            bool at_stop = (planning.snapshot_speed < 5);
-
-            // Check speed button clicks
-            if (point_in_rect(mx, my, brake_btn) && !at_stop) {
+            // Check speed button clicks - all three choices available at any speed
+            if (point_in_rect(mx, my, brake_btn)) {
                 planning.speed_choice = SPEED_BRAKE;
                 ui_clicked = true;
-            } else if (point_in_rect(mx, my, hold_btn) && !at_stop) {
+            } else if (point_in_rect(mx, my, hold_btn)) {
                 planning.speed_choice = SPEED_HOLD;
                 ui_clicked = true;
             } else if (point_in_rect(mx, my, accel_btn)) {
@@ -1018,38 +1046,26 @@ int main(int argc, char* argv[]) {
                 ui_clicked = true;
             }
 
-            // Check phase box clicks (only active phases are clickable)
-            for (int i = 0; i < 5; i++) {
-                bool is_active = (planning.active_phases_mask >> i) & 1;
-                if (is_active) {
-                    UIRect phase_box = ui_rect(platform.width - 305 + i * 58, 200, 52, 80);
-                    if (point_in_rect(mx, my, phase_box)) {
-                        planning.selected_phase = i;
-                        ui_clicked = true;
-                        break;
-                    }
-                }
-            }
+            // At 0 mph, maneuvers are limited to STRAIGHT
+            bool at_stop = (planning.snapshot_speed < 5);
 
-            // Maneuver selector click handling (only when paused, phase selected, AND not at 0 mph)
+            // Maneuver selector click handling (only when paused AND not at 0 mph)
             // At 0 mph, only STRAIGHT is allowed (no maneuver selection)
-            bool can_edit_maneuver = physics_is_paused(&physics) &&
-                                     planning.selected_phase >= 0 &&
-                                     ((planning.active_phases_mask >> planning.selected_phase) & 1) &&
-                                     !at_stop;
+            bool can_edit_maneuver = physics_is_paused(&physics) && !at_stop;
 
             if (can_edit_maneuver && !ui_clicked) {
                 // Row 1: Maneuver type buttons (5 buttons: STR, DFT, STP, BND, SWV)
+                // Y=200 matches rendering in draw section
                 ManeuverType maneuver_values[] = {MANEUVER_NONE, MANEUVER_DRIFT, MANEUVER_STEEP_DRIFT, MANEUVER_BEND, MANEUVER_SWERVE};
                 for (int m = 0; m < 5; m++) {
-                    UIRect btn = ui_rect(platform.width - 305 + m * 60, 295, 56, 35);
+                    UIRect btn = ui_rect(platform.width - 305 + m * 60, 200, 56, 35);
                     if (point_in_rect(mx, my, btn)) {
-                        planning.phase_maneuver[planning.selected_phase] = maneuver_values[m];
+                        planning.maneuver = maneuver_values[m];
                         // Reset direction to LEFT when changing maneuver type
-                        planning.phase_direction[planning.selected_phase] = MANEUVER_LEFT;
+                        planning.direction = MANEUVER_LEFT;
                         // Reset bend angle to 15 when selecting BEND or SWERVE
                         if (maneuver_values[m] == MANEUVER_BEND || maneuver_values[m] == MANEUVER_SWERVE) {
-                            planning.phase_bend_angle[planning.selected_phase] = 15;
+                            planning.bend_angle = 15;
                         }
                         ui_clicked = true;
                         break;
@@ -1057,29 +1073,31 @@ int main(int argc, char* argv[]) {
                 }
 
                 // Row 2: Direction buttons (LEFT / RIGHT)
-                ManeuverType sel_type = planning.phase_maneuver[planning.selected_phase];
+                // Y=245 matches rendering in draw section
+                ManeuverType sel_type = planning.maneuver;
                 bool needs_direction = (sel_type == MANEUVER_DRIFT || sel_type == MANEUVER_STEEP_DRIFT || sel_type == MANEUVER_BEND || sel_type == MANEUVER_SWERVE);
 
                 if (needs_direction && !ui_clicked) {
-                    UIRect left_btn = ui_rect(platform.width - 305, 340, 145, 35);
-                    UIRect right_btn = ui_rect(platform.width - 155, 340, 145, 35);
+                    UIRect left_btn = ui_rect(platform.width - 305, 245, 145, 35);
+                    UIRect right_btn = ui_rect(platform.width - 155, 245, 145, 35);
 
                     if (point_in_rect(mx, my, left_btn)) {
-                        planning.phase_direction[planning.selected_phase] = MANEUVER_LEFT;
+                        planning.direction = MANEUVER_LEFT;
                         ui_clicked = true;
                     } else if (point_in_rect(mx, my, right_btn)) {
-                        planning.phase_direction[planning.selected_phase] = MANEUVER_RIGHT;
+                        planning.direction = MANEUVER_RIGHT;
                         ui_clicked = true;
                     }
                 }
 
                 // Row 3: Bend angle buttons (15, 30, 45) - for BEND and SWERVE
+                // Y=290 matches rendering in draw section
                 if ((sel_type == MANEUVER_BEND || sel_type == MANEUVER_SWERVE) && !ui_clicked) {
                     int angles[] = {15, 30, 45};
                     for (int a = 0; a < 3; a++) {
-                        UIRect btn = ui_rect(platform.width - 305 + a * 100, 385, 95, 35);
+                        UIRect btn = ui_rect(platform.width - 305 + a * 100, 290, 95, 35);
                         if (point_in_rect(mx, my, btn)) {
-                            planning.phase_bend_angle[planning.selected_phase] = angles[a];
+                            planning.bend_angle = angles[a];
                             ui_clicked = true;
                             break;
                         }
@@ -1089,56 +1107,25 @@ int main(int argc, char* argv[]) {
 
             // Check Execute button click (moved down to Y=465)
             UIRect execute_btn = ui_rect(platform.width - 315, 465, 300, 50);
-            if (point_in_rect(mx, my, execute_btn)) {
+            if (point_in_rect(mx, my, execute_btn) && physics_is_paused(&physics)) {
                 Entity* selected = entity_manager_get_selected(&entities);
                 int exec_phys_id = (selected && selected->id < MAX_ENTITIES)
                                    ? entity_to_physics[selected->id] : -1;
 
-                // All speeds supported: 10-50+ mph
-                // Valid phase masks: any with at least one bit set
-                bool supported = (planning.active_phases_mask != 0);
-
-                if (!supported) {
-                    printf("[Turn] Speed %d mph - no active phases\n",
-                           planning.snapshot_speed);
-                    ui_clicked = true;
-                } else if (exec_phys_id < 0) {
+                if (exec_phys_id < 0) {
                     printf("[Turn] No vehicle selected!\n");
                     ui_clicked = true;
                 } else {
-                    // Special case: starting from stop (0-4 mph)
-                    // - Must use ACCEL (can't BRAKE or HOLD at 0)
-                    // - Only STRAIGHT allowed (no maneuvers at 0 mph)
+                    // At 0 mph, only STRAIGHT is allowed (no maneuvers)
                     bool starting_from_stop = (planning.snapshot_speed < 5);
-                    if (starting_from_stop) {
-                        planning.speed_choice = SPEED_ACCEL;  // Force ACCEL
-                    }
 
-                    // Generic multi-phase turn execution for all speeds
-                    // Build phase_indices[] and requests[] from active mask
-                    int phase_indices[5];
-                    ManeuverRequest requests[5];
-                    int num_phases = 0;
+                    // Get the maneuver for this turn (default to straight if none selected or at stop)
+                    ManeuverType maneuver_type = planning.maneuver;
+                    ManeuverDirection maneuver_dir = planning.direction;
+                    int bend_angle = planning.bend_angle;
 
-                    for (int i = 0; i < 5; i++) {
-                        if ((planning.active_phases_mask >> i) & 1) {
-                            phase_indices[num_phases] = i;
-
-                            // Force STRAIGHT when starting from stop
-                            if (starting_from_stop) {
-                                requests[num_phases].type = MANEUVER_STRAIGHT;
-                            } else {
-                                requests[num_phases].type = planning.phase_maneuver[i];
-                                if (requests[num_phases].type == MANEUVER_NONE) {
-                                    requests[num_phases].type = MANEUVER_STRAIGHT;
-                                }
-                            }
-                            requests[num_phases].direction = planning.phase_direction[i];
-                            requests[num_phases].bend_angle = planning.phase_bend_angle[i];
-                            requests[num_phases].skid_distance = 0;
-
-                            num_phases++;
-                        }
+                    if (starting_from_stop || maneuver_type == MANEUVER_NONE) {
+                        maneuver_type = MANEUVER_STRAIGHT;
                     }
 
                     // Check if cruise was active before executing
@@ -1148,49 +1135,49 @@ int main(int argc, char* argv[]) {
                     int target_speed_mph = calculate_next_speed(planning.snapshot_speed, planning.speed_choice);
                     if (target_speed_mph < 0) target_speed_mph = 0;
 
-                    if (num_phases > 0 && physics_vehicle_start_turn(&physics, exec_phys_id,
-                                                                      phase_indices, requests, num_phases)) {
-                        // Apply speed change via cruise control (PENDING until maneuver completes):
-                        // - ACCEL/BRAKE: always set pending cruise to reach target speed
-                        // - HOLD: only if cruise was already active (maintain current speed)
-                        bool should_set_cruise = (planning.speed_choice != SPEED_HOLD) || cruise_was_active;
-                        if (should_set_cruise) {
-                            float target_speed_ms = target_speed_mph / 2.237f;  // mph to m/s
-                            // Use pending so cruise target only updates AFTER kinematic maneuver ends
-                            physics_vehicle_cruise_set_pending(&physics, exec_phys_id, target_speed_ms);
-                        }
+                    // Send execute_maneuver event to Lua
+                    const char* maneuver_name = maneuver_to_script_name(maneuver_type, bend_angle);
+                    const char* direction_str = (maneuver_dir == MANEUVER_LEFT) ? "left" : "right";
 
-                        physics_unpause(&physics);
+                    ScriptEventData event_data = reflex_event_data_create();
+                    reflex_event_data_add_string(&event_data, "type", maneuver_name);
+                    reflex_event_data_add_string(&event_data, "direction", direction_str);
+                    reflex_event_data_add_float(&event_data, "duration", 1.0f);
 
-                        // Log what we're executing
-                        const char* speed_names[] = {"BRAKE", "HOLD", "ACCEL"};
-                        printf("[Turn] Executing %d mph turn (%d phases) -> %s to %d mph:",
-                               planning.snapshot_speed, num_phases,
-                               speed_names[planning.speed_choice], target_speed_mph);
-                        for (int p = 0; p < num_phases; p++) {
-                            printf(" P%d=%s", phase_indices[p] + 1,
-                                   maneuver_get_name(requests[p].type));
-                        }
-                        printf("\n");
+                    // Speed change info
+                    const char* speed_change_names[] = {"decelerate", "maintain", "accelerate"};
+                    reflex_event_data_add_string(&event_data, "speed_change", speed_change_names[planning.speed_choice]);
+                    reflex_event_data_add_float(&event_data, "target_speed", (float)target_speed_mph);
 
-                        // Update snapshot for next turn (speed will be at target after this turn completes)
-                        planning.snapshot_speed = target_speed_mph;
-                        planning.active_phases_mask = get_active_phases(planning.snapshot_speed);
+                    reflex_send_event(script_engine, exec_phys_id, "execute_maneuver", &event_data);
 
-                        // Reset maneuvers and select first active phase for the NEW speed
-                        for (int i = 0; i < 5; i++) {
-                            planning.phase_maneuver[i] = MANEUVER_NONE;
-                            planning.phase_direction[i] = MANEUVER_LEFT;
-                            planning.phase_bend_angle[i] = 0;
-                        }
-                        planning.selected_phase = -1;
-                        for (int i = 0; i < 5; i++) {
-                            if ((planning.active_phases_mask >> i) & 1) {
-                                planning.selected_phase = i;
-                                break;
-                            }
-                        }
+                    // Apply speed change via cruise control
+                    bool should_set_cruise = (planning.speed_choice != SPEED_HOLD) || cruise_was_active;
+                    if (should_set_cruise) {
+                        float target_speed_ms = target_speed_mph / 2.237f;  // mph to m/s
+                        physics_vehicle_cruise_set(&physics, exec_phys_id, target_speed_ms);
                     }
+
+                    physics_unpause(&physics);
+
+                    // Track that a turn is executing
+                    planning.turn_executing = true;
+                    planning.turn_vehicle_id = exec_phys_id;
+
+                    // Log what we're executing
+                    const char* speed_names[] = {"BRAKE", "HOLD", "ACCEL"};
+                    printf("[Turn] Executing %s %s at %d mph -> %s to %d mph\n",
+                           direction_str, maneuver_name,
+                           planning.snapshot_speed, speed_names[planning.speed_choice], target_speed_mph);
+
+                    // Update snapshot for next turn
+                    planning.snapshot_speed = target_speed_mph;
+
+                    // Reset maneuver for next turn
+                    planning.maneuver = MANEUVER_NONE;
+                    planning.direction = MANEUVER_LEFT;
+                    planning.bend_angle = 0;
+
                     ui_clicked = true;
                 }
             }
@@ -1325,6 +1312,53 @@ int main(int argc, char* argv[]) {
 
         // Always step physics simulation (gravity, collisions, etc. always active)
         physics_step(&physics, dt);
+
+        // Check if GUI-triggered turn has completed and re-pause physics
+        if (planning.turn_executing && planning.turn_vehicle_id >= 0) {
+            // Poll Lua to check if turn is still active
+            bool turn_still_active = reflex_is_turn_active(script_engine, planning.turn_vehicle_id);
+
+            if (!turn_still_active) {
+                // Turn completed - pause physics for next turn declaration
+                physics_pause(&physics);
+                planning.turn_executing = false;
+
+                // Get current speed for next turn snapshot
+                float vel_ms = 0.0f;
+                physics_vehicle_get_velocity(&physics, planning.turn_vehicle_id, &vel_ms);
+                planning.snapshot_speed = (int)(fabsf(vel_ms) * 2.237f);
+
+                // Reset maneuver for next turn
+                planning.maneuver = MANEUVER_NONE;
+                planning.direction = MANEUVER_LEFT;
+                planning.bend_angle = 0;
+
+                printf("[Turn] Turn complete - paused at %d mph\n", planning.snapshot_speed);
+                planning.turn_vehicle_id = -1;
+            }
+        }
+
+        // Update scripted turn timer
+        if (scripted_turn.active) {
+            scripted_turn.elapsed += dt;
+
+            // Check for turn completion
+            if (scripted_turn.elapsed >= scripted_turn.duration) {
+                // End the turn and get result
+                ManeuverResult result = reflex_end_turn(script_engine, scripted_turn.vehicle_id);
+
+                printf("[Turn] Completed: %s %s\n", scripted_turn.maneuver, scripted_turn.direction);
+                printf("[Turn] Result: %s (success=%s)\n",
+                       result.level, result.success ? "yes" : "no");
+                printf("[Turn] Heading: target=%.1f, achieved=%.1f, error=%.1f deg\n",
+                       result.heading_target, result.heading_achieved, result.heading_error);
+
+                // Reset turn state
+                scripted_turn.active = false;
+                scripted_turn.vehicle_id = -1;
+                scripted_turn.elapsed = 0.0f;
+            }
+        }
 
         // Sync physics state back to entities
         for (int i = 0; i < entities.count; i++) {
@@ -1570,85 +1604,50 @@ int main(int argc, char* argv[]) {
             ui_rect(platform.width - 315, 65, 300, 100),
             UI_COLOR_BG_DARK, section_border, 1.0f, 4.0f);
 
-        // Three speed buttons (highlight selected, grey out at 0 mph or in freestyle mode)
+        // Three speed buttons (highlight selected, grey out in freestyle mode only)
         {
             float sel_border = 3.0f;
             float norm_border = 1.0f;
-            bool at_stop = (planning.snapshot_speed < 5);  // 0 mph = only ACCEL allowed
             bool disabled = !turn_mode;  // Disable all in freestyle mode
 
-            // BRAKE button - greyed out at 0 mph or freestyle
+            // BRAKE button
             ui_draw_panel(&ui_renderer,
                 ui_rect(platform.width - 305, 100, 80, 50),
-                (disabled || at_stop) ? UI_COLOR_DISABLED : UI_COLOR_DANGER, UI_COLOR_WHITE,
+                disabled ? UI_COLOR_DISABLED : UI_COLOR_DANGER, UI_COLOR_WHITE,
                 (!disabled && planning.speed_choice == SPEED_BRAKE) ? sel_border : norm_border, 4.0f);
-            // HOLD button - greyed out at 0 mph or freestyle
+            // HOLD button
             ui_draw_panel(&ui_renderer,
                 ui_rect(platform.width - 210, 100, 80, 50),
-                (disabled || at_stop) ? UI_COLOR_DISABLED : UI_COLOR_SELECTED, UI_COLOR_WHITE,
+                disabled ? UI_COLOR_DISABLED : UI_COLOR_SELECTED, UI_COLOR_WHITE,
                 (!disabled && planning.speed_choice == SPEED_HOLD) ? sel_border : norm_border, 4.0f);
-            // ACCEL button - greyed out in freestyle
+            // ACCEL button
             ui_draw_panel(&ui_renderer,
                 ui_rect(platform.width - 115, 100, 80, 50),
                 disabled ? UI_COLOR_DISABLED : UI_COLOR_SAFE, UI_COLOR_WHITE,
                 (!disabled && planning.speed_choice == SPEED_ACCEL) ? sel_border : norm_border, 4.0f);
         }
 
-        // Phase boxes section (enlarged to fit maneuver selector below)
+        // Maneuver section (single maneuver per turn)
         ui_draw_panel(&ui_renderer,
             ui_rect(platform.width - 315, 175, 300, 280),
             UI_COLOR_BG_DARK, section_border, 1.0f, 4.0f);
 
-        // 5 phase boxes (highlight selected, grey out inactive or in freestyle mode)
-        for (int i = 0; i < 5; i++) {
-            bool is_active = turn_mode && ((planning.active_phases_mask >> i) & 1);
-            bool is_selected = turn_mode && (i == planning.selected_phase);
-
-            UIColor box_color, border;
-            float border_w;
-
-            if (!is_active) {
-                // Inactive phase or freestyle mode - greyed out
-                box_color = ui_color(0.15f, 0.15f, 0.2f, 1.0f);  // Dark grey
-                border = ui_color(0.25f, 0.25f, 0.3f, 1.0f);     // Dim border
-                border_w = 1.0f;
-            } else if (is_selected) {
-                // Active and selected - bright yellow
-                box_color = UI_COLOR_CAUTION;
-                border = UI_COLOR_WHITE;
-                border_w = 2.0f;
-            } else {
-                // Active but not selected - normal dark
-                box_color = UI_COLOR_BG_DARK;
-                border = ui_color(0.4f, 0.4f, 0.5f, 1.0f);
-                border_w = 1.0f;
-            }
-
-            ui_draw_panel(&ui_renderer,
-                ui_rect(platform.width - 305 + i * 58, 200, 52, 80),
-                box_color, border, border_w, 4.0f);
-        }
-
-        // Maneuver selector (only when physics paused, active phase selected, AND not at 0 mph)
+        // Maneuver selector (only when physics paused AND not at 0 mph)
         // At 0 mph, only STRAIGHT is allowed (starting from stop)
         bool at_stop_for_selector = (planning.snapshot_speed < 5);
-        bool show_maneuver_selector = physics_is_paused(&physics) &&
-                                      planning.selected_phase >= 0 &&
-                                      ((planning.active_phases_mask >> planning.selected_phase) & 1) &&
-                                      !at_stop_for_selector;
+        bool show_maneuver_selector = physics_is_paused(&physics) && !at_stop_for_selector;
 
         if (show_maneuver_selector) {
             // Row 1: Maneuver type buttons (5 buttons: STR, DFT, STP, BND, SWV)
-            const char* maneuver_types[] = {"STR", "DFT", "STP", "BND", "SWV"};
             ManeuverType maneuver_values[] = {MANEUVER_NONE, MANEUVER_DRIFT, MANEUVER_STEEP_DRIFT, MANEUVER_BEND, MANEUVER_SWERVE};
-            int current_maneuver = planning.phase_maneuver[planning.selected_phase];
+            int current_maneuver = planning.maneuver;
 
             for (int m = 0; m < 5; m++) {
                 bool is_sel = (current_maneuver == maneuver_values[m]);
                 UIColor btn_color = is_sel ? UI_COLOR_SELECTED : ui_color(0.2f, 0.2f, 0.3f, 1.0f);
                 UIColor btn_border = is_sel ? UI_COLOR_WHITE : ui_color(0.4f, 0.4f, 0.5f, 1.0f);
                 ui_draw_panel(&ui_renderer,
-                    ui_rect(platform.width - 305 + m * 60, 295, 56, 35),
+                    ui_rect(platform.width - 305 + m * 60, 200, 56, 35),
                     btn_color, btn_border, is_sel ? 2.0f : 1.0f, 4.0f);
             }
 
@@ -1657,17 +1656,17 @@ int main(int argc, char* argv[]) {
             bool needs_direction = (sel_type == MANEUVER_DRIFT || sel_type == MANEUVER_STEEP_DRIFT || sel_type == MANEUVER_BEND || sel_type == MANEUVER_SWERVE);
 
             if (needs_direction) {
-                ManeuverDirection current_dir = planning.phase_direction[planning.selected_phase];
+                ManeuverDirection current_dir = planning.direction;
                 bool left_sel = (current_dir == MANEUVER_LEFT);
                 bool right_sel = (current_dir == MANEUVER_RIGHT);
 
                 ui_draw_panel(&ui_renderer,
-                    ui_rect(platform.width - 305, 340, 145, 35),
+                    ui_rect(platform.width - 305, 245, 145, 35),
                     left_sel ? UI_COLOR_CAUTION : ui_color(0.2f, 0.2f, 0.3f, 1.0f),
                     left_sel ? UI_COLOR_WHITE : ui_color(0.4f, 0.4f, 0.5f, 1.0f),
                     left_sel ? 2.0f : 1.0f, 4.0f);
                 ui_draw_panel(&ui_renderer,
-                    ui_rect(platform.width - 155, 340, 145, 35),
+                    ui_rect(platform.width - 155, 245, 145, 35),
                     right_sel ? UI_COLOR_CAUTION : ui_color(0.2f, 0.2f, 0.3f, 1.0f),
                     right_sel ? UI_COLOR_WHITE : ui_color(0.4f, 0.4f, 0.5f, 1.0f),
                     right_sel ? 2.0f : 1.0f, 4.0f);
@@ -1676,12 +1675,12 @@ int main(int argc, char* argv[]) {
             // Row 3: Bend angle buttons (for BEND or SWERVE)
             if (sel_type == MANEUVER_BEND || sel_type == MANEUVER_SWERVE) {
                 int angles[] = {15, 30, 45};
-                int current_angle = planning.phase_bend_angle[planning.selected_phase];
+                int current_angle = planning.bend_angle;
 
                 for (int a = 0; a < 3; a++) {
                     bool angle_sel = (current_angle == angles[a]);
                     ui_draw_panel(&ui_renderer,
-                        ui_rect(platform.width - 305 + a * 100, 385, 95, 35),
+                        ui_rect(platform.width - 305 + a * 100, 290, 95, 35),
                         angle_sel ? UI_COLOR_SAFE : ui_color(0.2f, 0.2f, 0.3f, 1.0f),
                         angle_sel ? UI_COLOR_WHITE : ui_color(0.4f, 0.4f, 0.5f, 1.0f),
                         angle_sel ? 2.0f : 1.0f, 4.0f);
@@ -1843,84 +1842,45 @@ int main(int argc, char* argv[]) {
             text_draw_centered(&text_renderer, "ACCEL",
                 ui_rect(platform.width - 115, 100, 80, 50), UI_COLOR_WHITE);
 
-            // Phase section label with snapshot speed
+            // Maneuver section label with snapshot speed
             {
-                char phase_label[64];
+                char maneuver_label[64];
                 if (physics_is_paused(&physics) && planning.snapshot_speed > 0) {
-                    snprintf(phase_label, sizeof(phase_label), "PHASES (%d mph)", planning.snapshot_speed);
+                    snprintf(maneuver_label, sizeof(maneuver_label), "MANEUVER (%d mph)", planning.snapshot_speed);
                 } else {
-                    snprintf(phase_label, sizeof(phase_label), "PHASES");
+                    snprintf(maneuver_label, sizeof(maneuver_label), "MANEUVER");
                 }
-                text_draw(&text_renderer, phase_label, platform.width - 305, 180, UI_COLOR_WHITE);
+                text_draw(&text_renderer, maneuver_label, platform.width - 305, 180, UI_COLOR_WHITE);
             }
 
-            // Phase labels with maneuver indicator
-            const char* phase_labels[] = {"P1", "P2", "P3", "P4", "P5"};
-            for (int i = 0; i < 5; i++) {
-                bool is_active = (planning.active_phases_mask >> i) & 1;
-                UIColor label_color = is_active ? UI_COLOR_WHITE : UI_COLOR_DISABLED;
-
-                // Phase number at top of box
-                UIRect box_top = ui_rect(platform.width - 305 + i * 58, 205, 52, 25);
-                text_draw_centered(&text_renderer, phase_labels[i], box_top, label_color);
-
-                // Maneuver abbreviation at bottom of box (if declared)
-                if (is_active) {
-                    ManeuverType m = planning.phase_maneuver[i];
-                    ManeuverDirection d = planning.phase_direction[i];
-                    char maneuver_str[8] = "-";
-
-                    if (m == MANEUVER_DRIFT) {
-                        snprintf(maneuver_str, sizeof(maneuver_str), "D%c", d == MANEUVER_LEFT ? 'L' : 'R');
-                    } else if (m == MANEUVER_STEEP_DRIFT) {
-                        snprintf(maneuver_str, sizeof(maneuver_str), "S%c", d == MANEUVER_LEFT ? 'L' : 'R');
-                    } else if (m == MANEUVER_BEND) {
-                        snprintf(maneuver_str, sizeof(maneuver_str), "B%d%c",
-                                 planning.phase_bend_angle[i],
-                                 d == MANEUVER_LEFT ? 'L' : 'R');
-                    } else if (m == MANEUVER_SWERVE) {
-                        snprintf(maneuver_str, sizeof(maneuver_str), "W%d%c",
-                                 planning.phase_bend_angle[i],
-                                 d == MANEUVER_LEFT ? 'L' : 'R');
-                    }
-
-                    UIRect box_bot = ui_rect(platform.width - 305 + i * 58, 250, 52, 25);
-                    text_draw_centered(&text_renderer, maneuver_str, box_bot,
-                                       m == MANEUVER_NONE ? UI_COLOR_DISABLED : UI_COLOR_SAFE);
-                }
-            }
-
-            // Maneuver selector labels (only when paused with active phase selected, not at 0 mph)
+            // Maneuver selector labels (only when paused, not at 0 mph)
             bool at_stop_labels = (planning.snapshot_speed < 5);
-            bool show_selector_labels = physics_is_paused(&physics) &&
-                                        planning.selected_phase >= 0 &&
-                                        ((planning.active_phases_mask >> planning.selected_phase) & 1) &&
-                                        !at_stop_labels;
+            bool show_selector_labels = physics_is_paused(&physics) && !at_stop_labels;
 
             if (show_selector_labels) {
                 // Row 1: Maneuver type button labels (5 buttons)
                 const char* type_labels[] = {"STR", "DFT", "STP", "BND", "SWV"};
                 for (int m = 0; m < 5; m++) {
-                    UIRect btn = ui_rect(platform.width - 305 + m * 60, 295, 56, 35);
+                    UIRect btn = ui_rect(platform.width - 305 + m * 60, 200, 56, 35);
                     text_draw_centered(&text_renderer, type_labels[m], btn, UI_COLOR_WHITE);
                 }
 
                 // Row 2: Direction labels (only if maneuver needs direction)
-                ManeuverType sel_type = planning.phase_maneuver[planning.selected_phase];
+                ManeuverType sel_type = planning.maneuver;
                 bool needs_direction = (sel_type == MANEUVER_DRIFT || sel_type == MANEUVER_STEEP_DRIFT || sel_type == MANEUVER_BEND || sel_type == MANEUVER_SWERVE);
 
                 if (needs_direction) {
                     text_draw_centered(&text_renderer, "LEFT",
-                        ui_rect(platform.width - 305, 340, 145, 35), UI_COLOR_WHITE);
+                        ui_rect(platform.width - 305, 245, 145, 35), UI_COLOR_WHITE);
                     text_draw_centered(&text_renderer, "RIGHT",
-                        ui_rect(platform.width - 155, 340, 145, 35), UI_COLOR_WHITE);
+                        ui_rect(platform.width - 155, 245, 145, 35), UI_COLOR_WHITE);
                 }
 
                 // Row 3: Bend angle labels (if BEND or SWERVE selected)
                 if (sel_type == MANEUVER_BEND || sel_type == MANEUVER_SWERVE) {
                     const char* angle_labels[] = {"15", "30", "45"};
                     for (int a = 0; a < 3; a++) {
-                        UIRect btn = ui_rect(platform.width - 305 + a * 100, 385, 95, 35);
+                        UIRect btn = ui_rect(platform.width - 305 + a * 100, 290, 95, 35);
                         text_draw_centered(&text_renderer, angle_labels[a], btn, UI_COLOR_WHITE);
                     }
                 }
@@ -2134,46 +2094,31 @@ int main(int argc, char* argv[]) {
                         text_draw(&text_renderer, col_buf, col5, row2_y, UI_COLOR_SAFE);
                     }
                 } else {
-                    // Turn mode: Phase info
-                    snprintf(col_buf, sizeof(col_buf), "Selected Phase: P%d", planning.selected_phase + 1);
+                    // Turn mode: Maneuver info (single maneuver per turn)
+                    snprintf(col_buf, sizeof(col_buf), "Paused at: %d mph", planning.snapshot_speed);
                     text_draw(&text_renderer, col_buf, col1, row2_y, UI_COLOR_WHITE);
 
-                    // Show active phases
-                    char phases_str[32] = "Active: ";
-                    bool first = true;
-                    for (int i = 0; i < 5; i++) {
-                        if ((planning.active_phases_mask >> i) & 1) {
-                            char pnum[4];
-                            snprintf(pnum, sizeof(pnum), first ? "P%d" : ",P%d", i + 1);
-                            strncat(phases_str, pnum, sizeof(phases_str) - strlen(phases_str) - 1);
-                            first = false;
-                        }
-                    }
-                    text_draw(&text_renderer, phases_str, col3, row2_y, UI_COLOR_WHITE);
+                    // Show declared maneuver
+                    ManeuverType m = planning.maneuver;
+                    ManeuverDirection d = planning.direction;
+                    const char* dir_str = (d == MANEUVER_LEFT) ? "Left" : "Right";
 
-                    // Show declared maneuver for selected phase
-                    if (planning.selected_phase >= 0 && planning.selected_phase < 5) {
-                        ManeuverType m = planning.phase_maneuver[planning.selected_phase];
-                        ManeuverDirection d = planning.phase_direction[planning.selected_phase];
-                        const char* dir_str = (d == MANEUVER_LEFT) ? "Left" : "Right";
-
-                        if (m == MANEUVER_NONE) {
-                            snprintf(col_buf, sizeof(col_buf), "Maneuver: Straight");
-                        } else if (m == MANEUVER_DRIFT) {
-                            snprintf(col_buf, sizeof(col_buf), "Maneuver: Drift %s", dir_str);
-                        } else if (m == MANEUVER_STEEP_DRIFT) {
-                            snprintf(col_buf, sizeof(col_buf), "Maneuver: Steep %s", dir_str);
-                        } else if (m == MANEUVER_BEND) {
-                            snprintf(col_buf, sizeof(col_buf), "Maneuver: Bend %d %s",
-                                     planning.phase_bend_angle[planning.selected_phase], dir_str);
-                        } else if (m == MANEUVER_SWERVE) {
-                            snprintf(col_buf, sizeof(col_buf), "Maneuver: Swerve %d %s",
-                                     planning.phase_bend_angle[planning.selected_phase], dir_str);
-                        } else {
-                            snprintf(col_buf, sizeof(col_buf), "Maneuver: Straight");
-                        }
-                        text_draw(&text_renderer, col_buf, col5, row2_y, UI_COLOR_WHITE);
+                    if (m == MANEUVER_NONE || m == MANEUVER_STRAIGHT) {
+                        snprintf(col_buf, sizeof(col_buf), "Maneuver: Straight");
+                    } else if (m == MANEUVER_DRIFT) {
+                        snprintf(col_buf, sizeof(col_buf), "Maneuver: Drift %s", dir_str);
+                    } else if (m == MANEUVER_STEEP_DRIFT) {
+                        snprintf(col_buf, sizeof(col_buf), "Maneuver: Steep %s", dir_str);
+                    } else if (m == MANEUVER_BEND) {
+                        snprintf(col_buf, sizeof(col_buf), "Maneuver: Bend %d %s",
+                                 planning.bend_angle, dir_str);
+                    } else if (m == MANEUVER_SWERVE) {
+                        snprintf(col_buf, sizeof(col_buf), "Maneuver: Swerve %d %s",
+                                 planning.bend_angle, dir_str);
+                    } else {
+                        snprintf(col_buf, sizeof(col_buf), "Maneuver: Straight");
                     }
+                    text_draw(&text_renderer, col_buf, col3, row2_y, UI_COLOR_WHITE);
                 }
             }
 

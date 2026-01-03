@@ -1,4 +1,4 @@
-# Configuration Data Dictionary
+# Configuration Guide
 
 This guide explains all configuration values used in the game engine. Use this as a reference when tuning vehicles, physics, and scenes.
 
@@ -11,9 +11,10 @@ This guide explains all configuration values used in the game engine. Use this a
 3. [Chassis Configuration](#chassis-configuration)
 4. [Tire Configuration](#tire-configuration)
 5. [Power Plant Configuration](#power-plant-configuration)
-6. [tabletop Concepts](#car-wars-concepts)
+6. [Vehicle Classes](#vehicle-classes)
 7. [Vehicle JSON Structure](#vehicle-json-structure)
 8. [Scene JSON Structure](#scene-json-structure)
+9. [Script Configuration](#script-configuration)
 
 ---
 
@@ -21,7 +22,7 @@ This guide explains all configuration values used in the game engine. Use this a
 
 ### Jolt Physics Engine
 
-This game uses **Jolt Physics**, a modern physics engine. Key differences from older engines:
+This game uses **Jolt Physics**, a modern physics engine. Key concepts:
 
 | Concept | What It Does |
 |---------|--------------|
@@ -153,8 +154,8 @@ The chassis is the vehicle body - its size and weight.
 - Heavier = more momentum, harder to accelerate/brake, more stable
 - Lighter = quicker acceleration, easier to flip
 
-| tabletop Chassis | Weight (lbs) | Mass (kg) |
-|-----------------|--------------|-----------|
+| Chassis Type | Weight (lbs) | Mass (kg) |
+|--------------|--------------|-----------|
 | Subcompact | 1000 | 454 |
 | Compact | 1300 | 590 |
 | Mid-sized | 1600 | 726 |
@@ -219,8 +220,6 @@ The chassis is the vehicle body - its size and weight.
 }
 ```
 
-**Standard value:** `2.0` for all tires (tabletop physics - tire type affects damage, not grip)
-
 | Value | Grip Level | Use Case |
 |-------|------------|----------|
 | 0.5 | Very low | Ice |
@@ -228,11 +227,26 @@ The chassis is the vehicle body - its size and weight.
 | 1.5 | Normal | Dry road |
 | 2.0 | **Standard** | Arena default |
 | 3.0 | High | Racing slick |
-| 5.0 | Very high | Suction-cup grip |
+| 5.0 | Very high | Maximum grip |
 
 **Technical explanation:** Maximum friction force = mu × normal_force. With mu=2.0 and 250kg per wheel, max grip ≈ 4900 N per wheel.
 
-**Note:** In tabletop mode, all tires use mu=2.0. Tire types (standard, heavy-duty, solid, etc.) affect durability and combat rules, not physics grip.
+### Friction Curves
+
+For more realistic tire behavior, you can define friction curves:
+
+```json
+"friction": {
+    "longitudinal": {
+        "max_slip": 0.12,
+        "slip_curve": [[0.0, 0.0], [0.06, 0.9], [0.12, 1.0], [0.20, 0.95], [1.0, 0.8]]
+    },
+    "lateral": {
+        "max_slip_angle": 8.0,
+        "slip_curve": [[0.0, 0.0], [4.0, 0.9], [8.0, 1.0], [15.0, 0.9], [30.0, 0.7]]
+    }
+}
+```
 
 ---
 
@@ -240,21 +254,18 @@ The chassis is the vehicle body - its size and weight.
 
 ### Power Factors (PF)
 
-**What it is:** tabletop measure of engine power. Used to calculate acceleration and top speed.
+**What it is:** Measure of engine power. Used to calculate acceleration and top speed.
 
-**Not the same as:** Horsepower, watts, or real-world engine metrics.
-
-| Engine | Power Factors |
-|--------|---------------|
-| 10 cid Gas | 300 |
-| 100 cid Gas | 1300 |
-| 200 cid Gas | 2500 |
+| Engine Type | Power Factors |
+|-------------|---------------|
+| Small Gas | 300-800 |
+| Medium Gas | 1000-1500 |
+| Large Gas | 2000-3000 |
 | Small Electric | 800 |
 | Medium Electric | 1400 |
-| Super Electric | 2600 |
-| Nuclear | 20000 |
+| Large Electric | 2600 |
 
-### Acceleration Buckets
+### Acceleration Classes
 
 Acceleration is determined by the Power Factor to Weight ratio:
 
@@ -266,11 +277,6 @@ Acceleration is determined by the Power Factor to Weight ratio:
 | 1.00 - 1.99 | 15 mph/s | 4.0s |
 | 2.00 - 2.99 | 20 mph/s | 3.0s |
 | ≥ 3.00 | 25 mph/s | 2.4s |
-
-**Example:** Compact (590kg) + 200 cid engine (2500 PF):
-- Total weight = 590 + 218 = 808 kg = 1782 lbs
-- PF/Weight = 2500 / 1782 = 1.40
-- Acceleration = 15 mph/s bucket
 
 ### Top Speed Formulas
 
@@ -284,13 +290,9 @@ Top Speed (mph) = 240 × PF / (PF + weight_lbs)
 Top Speed (mph) = 360 × PF / (PF + weight_lbs)
 ```
 
-**Example:** Compact (1300 lbs chassis) + 100 cid (1300 PF, 265 lbs):
-- Weight = 1300 + 265 = 1565 lbs (without tires/equipment)
-- Top Speed = 240 × 1300 / (1300 + 1565) = 109 mph
-
 ---
 
-## tabletop Concepts
+## Vehicle Classes
 
 ### Handling Class (HC)
 
@@ -301,31 +303,13 @@ Top Speed (mph) = 360 × PF / (PF + weight_lbs)
 | -1 | Poor (vans) |
 | 0 | Normal |
 | 1 | Good (subcompact) |
-| 2 | Great (improved suspension) |
+| 2 | Great (sport suspension) |
 | 3+ | Excellent (racing setup) |
 
 **Affected by:**
 - Chassis type (vans -1, subcompacts +1)
-- Suspension type (+1 to +3)
-- Tire type (radials +1, slicks +2)
-- Active suspension (+1)
-
-### Spaces
-
-**What it is:** Interior volume available for equipment. Not physical size.
-
-| Equipment | Spaces Used |
-|-----------|-------------|
-| Machine Gun | 1 |
-| Heavy Laser | 3 |
-| Driver | 1 (built-in) |
-| Passenger | 1 |
-| Small Power Plant | 3 |
-| Large Power Plant | 5 |
-
-### Damage Points (DP)
-
-**What it is:** How much damage a component can take before being destroyed.
+- Suspension upgrades (+1 to +3)
+- Tire type (sport +1, racing +2)
 
 ---
 
@@ -382,6 +366,14 @@ Full vehicle configuration file:
             "steering": false,
             "axle_power": 1.0
         }
+    ],
+
+    "scripts": [
+        {
+            "name": "tcs",
+            "path": "scripts/modules/tcs.lua",
+            "enabled": true
+        }
     ]
 }
 ```
@@ -414,8 +406,8 @@ Standard wheel IDs:
 
 Power distribution is controlled per-axle using `axle_power` (0.0 to 1.0):
 
-| Configuration | Front `axle_power` | Rear `axle_power` | Description |
-|---------------|--------------------|--------------------|-------------|
+| Configuration | Front | Rear | Description |
+|---------------|-------|------|-------------|
 | RWD | 0.0 | 1.0 | Rear Wheel Drive |
 | FWD | 1.0 | 0.0 | Front Wheel Drive |
 | AWD | 0.5 | 0.5 | All Wheel Drive (50/50) |
@@ -502,6 +494,47 @@ Scene files define the arena and spawn vehicles:
 
 ---
 
+## Script Configuration
+
+Vehicles can have Lua scripts attached for custom behavior:
+
+```json
+"scripts": [
+    {
+        "name": "tcs",
+        "path": "scripts/modules/tcs.lua",
+        "enabled": true,
+        "options": {
+            "slip_threshold": 0.12,
+            "reduction_rate": 0.7
+        }
+    },
+    {
+        "name": "maneuver",
+        "path": "scripts/modules/maneuver.lua",
+        "enabled": true
+    }
+]
+```
+
+### Script Fields
+
+| Field | Description |
+|-------|-------------|
+| `name` | Script identifier (for logging/debugging) |
+| `path` | Path to Lua file (relative to assets/) |
+| `enabled` | Whether to run this script |
+| `options` | Key-value pairs passed to script |
+
+### Built-in Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `tcs.lua` | Traction Control - reduces throttle on wheel slip |
+| `maneuver.lua` | Turn-based maneuver execution |
+
+---
+
 ## Quick Reference
 
 ### Common Conversions
@@ -520,6 +553,6 @@ Scene files define the arena and spawn vehicles:
 | Suspension frequency | 3.0 Hz | Very stiff (race car) |
 | Suspension damping | 0.8 | Well-damped, fast response |
 | Suspension travel | 0.10 m | Short stroke |
-| Tire friction (mu) | 2.0 | Standardized for tabletop |
+| Tire friction (mu) | 2.0 | Standard grip |
 | Center of mass Y | -0.9 to -1.1 | Low for stability |
 | Gravity | -9.81 m/s² | Earth standard |

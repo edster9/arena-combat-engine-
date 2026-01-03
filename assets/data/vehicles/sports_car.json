@@ -70,6 +70,20 @@
         "tcs_enabled": true,
         "esc_enabled": false
       }
+    },
+    {
+      "name": "turn_executor",
+      "path": "scripts/turn_executor.lua",
+      "enabled": true,
+      "options": {
+        "default_duration": 1.0
+      }
+    },
+    {
+      "name": "tests",
+      "path": "scripts/tests.lua",
+      "enabled": true,
+      "options": {}
     }
   ]
 }

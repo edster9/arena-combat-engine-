@@ -28,6 +28,7 @@ Assets should be developed in parallel with code, but **placeholders are accepta
 │  (.vert, .frag)                                             │
 │                                                             │
 │  JSON files        ──► JSON ─────────────► Game Data        │
+│  Lua scripts       ──► Lua ──────────────► Reflex Scripts   │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -36,24 +37,23 @@ Assets should be developed in parallel with code, but **placeholders are accepta
 
 ## 3D Models Required
 
-### Phase 1: Demo
+### Current Assets
 
-| Asset                | Description             | Placeholder     |
-| -------------------- | ----------------------- | --------------- |
-| **Vehicle: Striker** | Compact car, aggressive | Colored box     |
-| **Vehicle: Bruiser** | Sedan, bulky, armored   | Colored box     |
-| **Arena Floor**      | Flat plane with grid    | Plane primitive |
-| **Arena Wall**       | Concrete/metal barrier  | Box primitive   |
-| **Obstacle: Block**  | Concrete barrier        | Box primitive   |
+| Asset | Description | Status |
+|-------|-------------|--------|
+| **Vehicles** | From Kenney Car Kit | Placeholder |
+| **Arena Floor** | Procedural shader | Working |
+| **Arena Walls** | Box primitives | Working |
+| **Obstacles** | Box/ramp primitives | Working |
 
-### Phase 2: Polish
+### Future Assets
 
-| Asset                   | Description                     |
-| ----------------------- | ------------------------------- |
-| **Weapon: Machine Gun** | Mounted gun barrels             |
-| **Weapon: Rocket Pod**  | Tube launcher                   |
-| **Debris**              | Scattered parts for destruction |
-| **Wreck**               | Destroyed vehicle husk          |
+| Asset | Description |
+|-------|-------------|
+| **Combat Vehicles** | Stylized cars with visible weapons |
+| **Weapon Models** | Machine guns, rockets, lasers |
+| **Debris** | Scattered parts for destruction |
+| **Wrecks** | Destroyed vehicle husks |
 
 ### Model Specifications
 
@@ -69,89 +69,66 @@ Coordinate system:
   - Origin at vehicle center, on ground plane
 
 Scale:
-  - 1 unit = 1 inch (tabletop scale)
-  - Typical car: ~180 units long (15 feet)
+  - 1 unit = 1 meter
+  - Typical car: ~4.5 units long
 ```
 
 ---
 
 ## Textures Required
 
-### Phase 1: Demo
-
-| Asset                | Size    | Description              |
-| -------------------- | ------- | ------------------------ |
-| **Arena floor**      | 512x512 | Concrete with grid lines |
-| **Arena wall**       | 256x256 | Metal/concrete barrier   |
-| **Vehicle: Striker** | 256x256 | Red/orange team color    |
-| **Vehicle: Bruiser** | 256x256 | Blue/green team color    |
-
-### Phase 2: Polish
-
-| Asset              | Size    | Description                  |
-| ------------------ | ------- | ---------------------------- |
-| **Damage overlay** | 256x256 | Scratches, dents, burns      |
-| **Fire texture**   | 128x128 | Animated fire (sprite sheet) |
-| **Smoke texture**  | 128x128 | Particle smoke               |
-| **Explosion**      | 256x256 | Animated explosion           |
-| **Muzzle flash**   | 64x64   | Gun firing effect            |
-| **Tracer**         | 32x32   | Bullet trail                 |
+| Asset | Size | Description |
+|-------|------|-------------|
+| **Arena floor** | 512x512 | Concrete with grid lines |
+| **Arena wall** | 256x256 | Metal/concrete barrier |
+| **Vehicle textures** | 256x256 | Team colors with weathering |
+| **Damage overlay** | 256x256 | Scratches, dents, burns |
+| **Effects** | 128x128 | Fire, smoke, muzzle flash |
 
 ### Texture Guidelines
 
 ```
 Format: PNG (RGBA)
 Size: Power of 2 (64, 128, 256, 512, 1024)
-Style: Painterly/illustrated, not photo-realistic
+Style: Stylized, not photo-realistic
 Mip-maps: Generated at load time
 ```
 
 ---
 
-## Shaders Required
+## Shaders
 
-### Phase 1: Demo
+### Current Shaders
 
-| Shader                    | Purpose                       |
-| ------------------------- | ----------------------------- |
-| **basic.vert/frag**       | Simple textured + lit         |
-| **grid.vert/frag**        | Arena floor with grid overlay |
-| **solid_color.vert/frag** | Debug/placeholder shapes      |
+| Shader | Purpose |
+|--------|---------|
+| `grid.vert/frag` | Arena floor with procedural grid |
+| `solid_color.vert/frag` | Debug and placeholder shapes |
+| `vehicle.vert/frag` | Lit vehicles with team colors |
 
-### Phase 2: Polish
+### Planned Shaders
 
-| Shader                 | Purpose                    |
-| ---------------------- | -------------------------- |
-| **vehicle.vert/frag**  | Vehicle with damage states |
-| **fire.vert/frag**     | Animated fire effect       |
-| **particle.vert/frag** | Particle systems           |
-| **ui.vert/frag**       | 2D UI elements             |
+| Shader | Purpose |
+|--------|---------|
+| `fire.vert/frag` | Animated fire effect |
+| `particle.vert/frag` | Particle systems |
+| `ui.vert/frag` | 2D UI elements |
+| `ghost.vert/frag` | Movement preview paths |
 
 ---
 
-## Audio Required
+## Audio (Planned)
 
-### Phase 1: Demo (Optional)
+### Sound Effects
 
-Audio not required for core demo but nice to have:
-
-| Sound           | Description      |
-| --------------- | ---------------- |
-| **Engine idle** | Vehicle humming  |
-| **Engine rev**  | Acceleration     |
-| **Collision**   | Metal crash      |
-| **Machine gun** | Rapid fire burst |
-
-### Phase 2: Polish
-
-| Sound               | Description       |
-| ------------------- | ----------------- |
-| **Rocket launch**   | Whoosh            |
-| **Rocket hit**      | Explosion         |
-| **Tire screech**    | Hard turning      |
-| **Fire crackle**    | Burning vehicle   |
-| **Victory fanfare** | Game won          |
-| **Ambient**         | Arena crowd noise |
+| Sound | Description |
+|-------|-------------|
+| **Engine idle** | Vehicle humming |
+| **Engine rev** | Acceleration |
+| **Collision** | Metal crash |
+| **Tire screech** | Hard turning |
+| **Weapons** | Machine gun, rockets |
+| **Explosion** | Vehicle destruction |
 
 ### Audio Specifications
 
@@ -163,83 +140,70 @@ Normalize to -3dB peak
 
 ---
 
-## UI Assets Required
+## Scripts
 
-### Phase 1: Demo
+### Lua Reflex Scripts
 
-| Asset          | Description                   |
-| -------------- | ----------------------------- |
-| **Button**     | 9-slice button graphic        |
-| **Panel**      | UI background panel           |
-| **Font**       | Monospace or typewriter style |
-| **Health bar** | Armor/hull display            |
+Located in `assets/scripts/`:
 
-### Phase 2: Polish
+| Script | Purpose |
+|--------|---------|
+| `master.lua` | Main script coordinator |
+| `modules/tcs.lua` | Traction control system |
+| `modules/maneuver.lua` | Turn-based maneuver execution |
 
-| Asset                    | Description            |
-| ------------------------ | ---------------------- |
-| **Vehicle record sheet** | Classic tabletop style |
-| **Weapon icons**         | MG, rocket, etc.       |
-| **Status icons**         | Fire, disabled, etc.   |
-| **Turn indicator**       | Current phase display  |
-
-### UI Style Direction
-
-```
-Aesthetic: Paper/cardboard, typewriter text
-Colors: Tan, brown, black ink
-Borders: Rough edges, stamped look
-Reference: Original tabletop record sheets
-```
+Scripts are hot-reloadable with F5 during development.
 
 ---
 
-## Placeholder Strategy
+## Current Resources
 
-While developing, use programmer art:
+### Kenney Car Kit (CC0)
 
-| Final Asset   | Placeholder                       |
-| ------------- | --------------------------------- |
-| Vehicle model | Colored box with arrow for facing |
-| Arena floor   | Checkered or solid color plane    |
-| Weapons       | Cylinder primitives               |
-| Fire/smoke    | Colored billboards                |
-| UI buttons    | Solid colored rectangles          |
+- **Location:** `assets/models/vehicles/kenney-car-kit/`
+- **License:** CC0 (Public Domain) - Free for commercial use
+- **Format:** OBJ, FBX, GLB
+- **Website:** https://kenney.nl/assets/car-kit
 
-**Rule:** If a placeholder is blocking progress, simplify until you can move forward.
+**Available Models:**
+
+| Vehicle Type | Models |
+|--------------|--------|
+| Cars | sedan, sedan-sports, hatchback-sports, taxi, police |
+| Racing | race, race-future |
+| Trucks | truck, truck-flat, delivery |
+| SUVs | suv, suv-luxury |
+| Utility | ambulance, firetruck, van |
+
+**Bonus Assets:**
+- Multiple wheel variants
+- Debris pieces (doors, tires, plates, spoilers)
+- Traffic props (cones, boxes)
 
 ---
 
 ## Asset Sources
 
-### Create Ourselves
+### Free/CC Resources
 
-- Shaders (must be custom)
-- Game data (JSON configs)
-- UI layout
+| Source | Type | License |
+|--------|------|---------|
+| Kenney.nl | Game assets | CC0 |
+| OpenGameArt.org | Various | Check individual |
+| Quaternius | Low-poly 3D | CC0 |
+| Freesound.org | Sound effects | Various |
 
-### Commission or Purchase
+### Paid Resources (Future)
 
-- 3D vehicle models (stylized)
-- Texture art (stylized)
-- Sound effects
-
-### Free/CC Resources (Temporary)
-
-| Source          | Type                     |
-| --------------- | ------------------------ |
-| OpenGameArt.org | Models, textures, sounds |
-| Freesound.org   | Sound effects            |
-| Kenney.nl       | Game assets, CC0         |
-| Quaternius      | Low-poly 3D models       |
-
-**Note:** Check licenses. Prefer CC0 or CC-BY for commercial use.
+| Source | Type |
+|--------|------|
+| Sketchfab | Stylized vehicles |
+| CGTrader | Game-ready assets |
+| TurboSquid | Professional models |
 
 ---
 
-## Art Direction Reference
-
-To communicate the desired style to artists:
+## Art Direction
 
 ### Vehicle Style
 
@@ -247,7 +211,7 @@ To communicate the desired style to artists:
 - Visible weapons (not hidden)
 - Bright team colors
 - Wear and tear details
-- NOT realistic, NOT cartoony
+- Stylized, not realistic
 
 ### Arena Style
 
@@ -255,144 +219,12 @@ To communicate the desired style to artists:
 - Grid visible but integrated
 - Stains, cracks, history
 - Barriers feel heavy
-- Lighting: harsh overhead spots
-
-### Reference Images to Collect
-
-- [ ] Original tabletop box art
-- [ ] Denis Loubet vehicle illustrations
-- [ ] Gaslands miniatures (modern reference)
-- [ ] Micro Machines toys (toy car aesthetic)
-- [ ] Tabletop Simulator board games
-
----
-
-## Art Creation Strategy (DECISION)
-
-### Approach: AI-Assisted + Purchased Assets
-
-| Asset Type                | Strategy                                               |
-| ------------------------- | ------------------------------------------------------ |
-| **Textures**              | AI-generated from book art references, then refined    |
-| **Vehicle models**        | Purchase/license stylized car models, modify as needed |
-| **Building/arena models** | Purchase basic industrial assets, customize            |
-| **UI elements**           | AI-assisted based on record sheet scans                |
-| **Shaders**               | Hand-written (must be custom)                          |
-| **Game data**             | Hand-written JSON                                      |
-
-### Reference Material
-
-Extract from the tabletop books in `/books/`:
-
-- Vehicle illustrations for AI texture prompts
-- Arena layouts for level design
-- Record sheets for UI design
-- equipment catalog art for equipment icons
-
-### AI Texture Workflow
-
-1. Scan/screenshot reference from books
-2. Describe style to AI image generator
-3. Generate base texture
-4. Clean up in image editor (GIMP/Photoshop)
-5. Ensure seamless tiling if needed
-6. Export as PNG power-of-2
-
-### Model Purchasing
-
-Potential sources:
-
-- **Sketchfab** - Stylized vehicle models
-- **TurboSquid** - Industrial environments
-- **CGTrader** - Various game-ready assets
-- **Unity Asset Store** - Even for non-Unity use (check license)
-
-Budget: Allocate for 2-3 quality vehicle models and basic arena kit.
-
----
-
-## 3D Model Resources Research
-
-### Currently Using
-
-#### Kenney Car Kit (CC0) - INSTALLED
-
-- **Location:** `assets/models/vehicles/kenney-car-kit/`
-- **License:** CC0 (Public Domain) - Free for commercial use
-- **Format:** OBJ, FBX, GLB (all formats included)
-- **Website:** https://kenney.nl/assets/car-kit
-
-**Available Models:**
-| Vehicle Type | Models |
-|--------------|--------|
-| Cars | sedan, sedan-sports, hatchback-sports, taxi, police |
-| Racing | race, race-future |
-| Trucks | truck, truck-flat, delivery, delivery-flat |
-| SUVs | suv, suv-luxury |
-| Utility | ambulance, firetruck, garbage-truck, van |
-| Tractors | tractor, tractor-police, tractor-shovel |
-
-**Bonus Assets:**
-
-- Multiple wheel variants (default, dark, racing, truck)
-- Debris pieces (doors, tires, plates, spoilers)
-- Traffic props (cones, boxes)
-- Textures included
-
-**Recommended for tabletop:**
-
-- `sedan-sports` - Good compact armed vehicle base
-- `race-future` - Futuristic variant
-- `truck` / `truck-flat` - Heavy vehicle base
-- `suv` - Mid-size armored vehicle base
-- Debris pieces for destruction effects
-
----
-
-### Alternative Sources (For Future Consideration)
-
-#### Free Resources (CC0/CC-BY)
-
-| Source                | Type        | Notes                       |
-| --------------------- | ----------- | --------------------------- |
-| **OpenGameArt.org**   | Various     | Check individual licenses   |
-| **Quaternius**        | Low-poly 3D | Free packs, stylized        |
-| **Sketchfab (Free)**  | Mixed       | Filter by license carefully |
-| **Turbosquid (Free)** | Mixed       | Check commercial use rights |
-
-#### Paid Resources (Higher Quality)
-
-| Source                | Type              | Price Range | Notes                        |
-| --------------------- | ----------------- | ----------- | ---------------------------- |
-| **Sketchfab Store**   | Stylized vehicles | $5-50       | Good low-poly options        |
-| **CGTrader**          | Game-ready assets | $10-100     | Wide variety                 |
-| **Unity Asset Store** | Vehicle packs     | $15-75      | License allows non-Unity use |
-| **TurboSquid Pro**    | Professional      | $20-200     | High quality, check license  |
-
-#### Gaslands/Miniature Style
-
-For authentic tabletop miniature aesthetic:
-
-- **Thingiverse** - Gaslands STL files (need 3D printing or conversion)
-- **MyMiniFactory** - Combat vehicles STLs
-- **Patreon creators** - Custom vehicle designs
-
-**Note:** STL files require conversion to usable game formats (OBJ/FBX/glTF).
-
----
-
-### Recommended Progression
-
-1. **Phase 1 (Now):** Kenney Car Kit for prototyping and scale testing
-2. **Phase 2 (Demo):** Modify Kenney models with weapon attachments in Blender
-3. **Phase 3 (Polish):** Commission or purchase stylized combat vehicles
-4. **Phase 4 (Release):** Original models matching tabletop aesthetic
+- Harsh overhead lighting
 
 ---
 
 ## Open Questions
 
-- [ ] What modeling software? Blender is free and capable.
-- [ ] Style guide document needed for consistency?
-- [ ] Vehicle modularity: One mesh or separate parts (weapons, wheels)?
-- [ ] Which AI image generator? (Midjourney, Stable Diffusion, DALL-E)
+- [ ] Custom vehicle models: Commission or purchase?
+- [ ] Audio: In-house or licensed?
+- [ ] Style guide for consistent look?

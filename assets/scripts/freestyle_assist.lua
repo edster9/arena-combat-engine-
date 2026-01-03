@@ -24,8 +24,7 @@
 -- Load reusable modules (singletons - use ctx.state for per-entity data)
 local abs = require("modules/abs")
 local tcs = require("modules/tcs")
-local launch_control = require("modules/launch_control")
-local timer_0_60 = require("modules/timer_0_60")
+local esc = require("modules/esc")
 
 -- ============================================================================
 -- CONFIGURATION
@@ -66,15 +65,6 @@ local function apply_config(ctx)
 end
 
 -- ============================================================================
--- ESC - ELECTRONIC STABILITY CONTROL (placeholder)
--- ============================================================================
-local function esc_update(ctx)
-    if not ctx.state.esc_enabled then return end
-    -- TODO: Detect oversteer/understeer via yaw rate vs expected yaw
-    -- and apply counter-steer or brake individual wheels
-end
-
--- ============================================================================
 -- MAIN UPDATE
 -- ============================================================================
 function update(ctx)
@@ -83,10 +73,6 @@ function update(ctx)
 
     -- Run all enabled assists (pass ctx - modules use ctx.state for per-entity data)
     abs.update(ctx)
-    launch_control.update(ctx)  -- TEST B: Throttle limiting before TCS
     tcs.update(ctx)
-    esc_update(ctx)
-
-    -- Performance timing (always active)
-    timer_0_60.update(ctx)
+    esc.update(ctx)
 end

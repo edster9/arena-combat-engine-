@@ -1,8 +1,12 @@
 # Proposal: Physics-Based Turn System
 
 **Date:** 2025-12-30
-**Status:** Draft for Discussion
+**Status:** IMPLEMENTED (January 2025)
 **Author:** Design Session Notes
+
+> **Note:** This proposal has been implemented. The core concepts (single-phase turns,
+> physics execution, Lua scripting) are now part of the engine. This document is
+> preserved as a historical reference for understanding design decisions.
 
 ## Executive Summary
 
