@@ -47,6 +47,8 @@ typedef struct {
     int base_hc_modifier;
     // Model path (relative to assets)
     char model[128];
+    // Texture path (relative to assets) - optional, can be overridden by vehicle config
+    char texture[128];
     // Wheel mount positions
     WheelMount wheel_mounts[MAX_WHEEL_MOUNTS];
     int wheel_mount_count;

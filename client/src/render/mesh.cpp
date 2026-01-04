@@ -41,6 +41,52 @@ static const char* box_frag_src =
     "    FragColor = vec4(result, 1.0);\n"
     "}\n";
 
+// Vertex shader for textured meshes
+static const char* textured_vert_src =
+    "#version 330 core\n"
+    "layout (location = 0) in vec3 aPos;\n"
+    "layout (location = 1) in vec3 aNormal;\n"
+    "layout (location = 2) in vec2 aTexCoord;\n"
+    "out vec3 fragNormal;\n"
+    "out vec3 fragPos;\n"
+    "out vec2 texCoord;\n"
+    "uniform mat4 model;\n"
+    "uniform mat4 view;\n"
+    "uniform mat4 projection;\n"
+    "void main() {\n"
+    "    fragPos = vec3(model * vec4(aPos, 1.0));\n"
+    "    fragNormal = mat3(transpose(inverse(model))) * aNormal;\n"
+    "    texCoord = aTexCoord;\n"
+    "    gl_Position = projection * view * vec4(fragPos, 1.0);\n"
+    "}\n";
+
+// Fragment shader for textured meshes with lighting
+static const char* textured_frag_src =
+    "#version 330 core\n"
+    "in vec3 fragNormal;\n"
+    "in vec3 fragPos;\n"
+    "in vec2 texCoord;\n"
+    "out vec4 FragColor;\n"
+    "uniform vec3 lightDir;\n"
+    "uniform sampler2D textureSampler;\n"
+    "void main() {\n"
+    "    vec3 norm = normalize(fragNormal);\n"
+    "    vec3 light = normalize(-lightDir);\n"
+    "    \n"
+    "    // Ambient\n"
+    "    float ambient = 0.3;\n"
+    "    \n"
+    "    // Diffuse\n"
+    "    float diff = max(dot(norm, light), 0.0);\n"
+    "    \n"
+    "    // Sample texture\n"
+    "    vec3 texColor = texture(textureSampler, texCoord).rgb;\n"
+    "    \n"
+    "    // Combine lighting with texture\n"
+    "    vec3 result = (ambient + diff * 0.7) * texColor;\n"
+    "    FragColor = vec4(result, 1.0);\n"
+    "}\n";
+
 // Unit box vertices with normals (position, normal)
 static const float box_vertices[] = {
     // Front face (z = 0.5)
@@ -123,15 +169,30 @@ bool box_renderer_init(BoxRenderer* r) {
         return false;
     }
 
-    // Cache uniform locations (avoid glGetUniformLocation every frame)
+    // Cache uniform locations for color shader
     r->u_model = glGetUniformLocation(r->shader.program, "model");
     r->u_view = glGetUniformLocation(r->shader.program, "view");
     r->u_projection = glGetUniformLocation(r->shader.program, "projection");
     r->u_lightDir = glGetUniformLocation(r->shader.program, "lightDir");
     r->u_objectColor = glGetUniformLocation(r->shader.program, "objectColor");
 
+    // Create textured shader
+    if (!shader_create(&r->textured_shader, textured_vert_src, textured_frag_src)) {
+        fprintf(stderr, "Failed to create textured shader\n");
+        shader_destroy(&r->shader);
+        return false;
+    }
+
+    // Cache uniform locations for textured shader
+    r->ut_model = glGetUniformLocation(r->textured_shader.program, "model");
+    r->ut_view = glGetUniformLocation(r->textured_shader.program, "view");
+    r->ut_projection = glGetUniformLocation(r->textured_shader.program, "projection");
+    r->ut_lightDir = glGetUniformLocation(r->textured_shader.program, "lightDir");
+    r->ut_texture = glGetUniformLocation(r->textured_shader.program, "textureSampler");
+
     if (!create_box_mesh(&r->unit_box)) {
         shader_destroy(&r->shader);
+        shader_destroy(&r->textured_shader);
         return false;
     }
 
@@ -142,6 +203,7 @@ bool box_renderer_init(BoxRenderer* r) {
 void box_renderer_destroy(BoxRenderer* r) {
     if (r->valid) {
         shader_destroy(&r->shader);
+        shader_destroy(&r->textured_shader);
         glDeleteVertexArrays(1, &r->unit_box.vao);
         glDeleteBuffers(1, &r->unit_box.vbo);
         r->valid = false;
@@ -149,6 +211,11 @@ void box_renderer_destroy(BoxRenderer* r) {
 }
 
 void box_renderer_begin(BoxRenderer* r, Mat4* view, Mat4* projection, Vec3 light_dir) {
+    // Cache frame data for textured shader
+    r->cached_view = *view;
+    r->cached_projection = *projection;
+    r->cached_light_dir = light_dir;
+
     shader_use(&r->shader);
     // Use cached uniform locations (faster than glGetUniformLocation every frame)
     glUniformMatrix4fv(r->u_view, 1, GL_FALSE, view->m);
@@ -393,6 +460,69 @@ void box_renderer_draw_mesh_rotated(BoxRenderer* r, GLuint vao, int vertex_count
 
     glBindVertexArray(vao);
     glDrawArrays(GL_TRIANGLES, 0, vertex_count);
+    glBindVertexArray(r->unit_box.vao);
+}
+
+void box_renderer_draw_mesh_textured(BoxRenderer* r, GLuint vao, int vertex_count,
+                                     Vec3 pos, float scale, const float* rot_matrix,
+                                     Vec3 pre_translate, GLuint texture) {
+    // Switch to textured shader
+    shader_use(&r->textured_shader);
+
+    // Set view/projection/light from cached frame data
+    glUniformMatrix4fv(r->ut_view, 1, GL_FALSE, r->cached_view.m);
+    glUniformMatrix4fv(r->ut_projection, 1, GL_FALSE, r->cached_projection.m);
+    glUniform3f(r->ut_lightDir, r->cached_light_dir.x, r->cached_light_dir.y, r->cached_light_dir.z);
+
+    // Build model matrix: T * R * S * T_pre
+    // rot_matrix is 3x3 ROW-MAJOR (like chassis), convert to OpenGL column-major
+
+    // Apply pre-translation and scale
+    float px = pre_translate.x * scale;
+    float py = pre_translate.y * scale;
+    float pz = pre_translate.z * scale;
+
+    // Rotate the pre-translation (row-major: multiply by columns)
+    float rpx = rot_matrix[0] * px + rot_matrix[1] * py + rot_matrix[2] * pz;
+    float rpy = rot_matrix[3] * px + rot_matrix[4] * py + rot_matrix[5] * pz;
+    float rpz = rot_matrix[6] * px + rot_matrix[7] * py + rot_matrix[8] * pz;
+
+    Mat4 model = mat4_identity();
+
+    // Convert row-major to column-major: transpose while scaling
+    model.m[0] = rot_matrix[0] * scale;
+    model.m[1] = rot_matrix[3] * scale;
+    model.m[2] = rot_matrix[6] * scale;
+    model.m[3] = 0;
+
+    model.m[4] = rot_matrix[1] * scale;
+    model.m[5] = rot_matrix[4] * scale;
+    model.m[6] = rot_matrix[7] * scale;
+    model.m[7] = 0;
+
+    model.m[8] = rot_matrix[2] * scale;
+    model.m[9] = rot_matrix[5] * scale;
+    model.m[10] = rot_matrix[8] * scale;
+    model.m[11] = 0;
+
+    // Translation (includes rotated pre-translation)
+    model.m[12] = pos.x + rpx;
+    model.m[13] = pos.y + rpy;
+    model.m[14] = pos.z + rpz;
+    model.m[15] = 1;
+
+    glUniformMatrix4fv(r->ut_model, 1, GL_FALSE, model.m);
+
+    // Bind texture
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glUniform1i(r->ut_texture, 0);
+
+    glBindVertexArray(vao);
+    glDrawArrays(GL_TRIANGLES, 0, vertex_count);
+
+    // Switch back to color shader for subsequent draws
+    shader_use(&r->shader);
     glBindVertexArray(r->unit_box.vao);
 }
 

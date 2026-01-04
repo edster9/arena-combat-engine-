@@ -28,7 +28,7 @@
       "rotation": 0.0
     },
     {
-      "type": "sports_car",
+      "type": "pickup_truck",
       "team": "blue",
       "position": [50, 0, -350],
       "rotation": 0.0

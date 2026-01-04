@@ -62,6 +62,7 @@
       "wheels": 4,
       "can_have_6_wheels": false,
       "model": "models/chassis/compact_body.obj",
+      "texture": "models/textures/colormap.png",
       "wheel_mounts": [
         { "id": "FL", "position": [0.95, -0.45, 0.85] },
         { "id": "FR", "position": [0.95, -0.45, -0.85] },
@@ -117,7 +118,8 @@
       "base_hc_modifier": 0,
       "wheels": 4,
       "can_have_6_wheels": true,
-      "model": "models/chassis/compact_body.obj",
+      "model": "models/chassis/sports_body.obj",
+      "texture": "models/textures/colormap.png",
       "wheel_mounts": [
         { "id": "FL", "position": [0.95, -0.45, 0.85] },
         { "id": "FR", "position": [0.95, -0.45, -0.85] },
@@ -125,7 +127,7 @@
         { "id": "RR", "position": [-0.88, -0.45, -0.85] }
       ],
       "physics": {
-        "center_of_mass": [0, -1.1, 0]
+        "center_of_mass": [0, -0.3, 0]
       }
     },
     "luxury": {
@@ -145,7 +147,7 @@
       "base_hc_modifier": 0,
       "wheels": 4,
       "can_have_6_wheels": true,
-      "model": "models/chassis/compact_body.obj",
+      "model": "models/chassis/sports_body.obj",
       "wheel_mounts": [
         { "id": "FL", "position": [0.95, -0.45, 0.85] },
         { "id": "FR", "position": [0.95, -0.45, -0.85] },
@@ -153,7 +155,7 @@
         { "id": "RR", "position": [-0.88, -0.45, -0.85] }
       ],
       "physics": {
-        "center_of_mass": [0, -1.1, 0]
+        "center_of_mass": [0, -0.3, 0]
       }
     },
     "station_wagon": {
@@ -201,15 +203,16 @@
       "base_hc_modifier": 0,
       "wheels": 4,
       "can_have_6_wheels": true,
-      "model": "models/chassis/compact_body.obj",
+      "model": "models/chassis/pickup_body.obj",
+      "texture": "models/textures/colormap.png",
       "wheel_mounts": [
-        { "id": "FL", "position": [0.95, -0.45, 0.85] },
-        { "id": "FR", "position": [0.95, -0.45, -0.85] },
-        { "id": "RL", "position": [-0.88, -0.45, 0.85] },
-        { "id": "RR", "position": [-0.88, -0.45, -0.85] }
+        { "id": "FL", "position": [1.10, -0.45, 0.95] },
+        { "id": "FR", "position": [1.10, -0.45, -0.95] },
+        { "id": "RL", "position": [-1.02, -0.45, 0.95] },
+        { "id": "RR", "position": [-1.02, -0.45, -0.95] }
       ],
       "physics": {
-        "center_of_mass": [0, -1.1, 0]
+        "center_of_mass": [0, -0.3, 0]
       },
       "notes": "HC -1 if over 5500 lbs"
     },

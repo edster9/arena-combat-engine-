@@ -98,6 +98,8 @@ bool obj_load_groups(LoadedMesh* mesh, const char* filepath, const char** groups
     mesh->valid = false;
     mesh->vao = 0;
     mesh->vbo = 0;
+    mesh->uv_vbo = 0;
+    mesh->has_uvs = false;
     mesh->vertex_count = 0;
     mesh->bounds_min = vec3(FLT_MAX, FLT_MAX, FLT_MAX);
     mesh->bounds_max = vec3(-FLT_MAX, -FLT_MAX, -FLT_MAX);
@@ -306,6 +308,45 @@ bool obj_load_groups(LoadedMesh* mesh, const char* filepath, const char** groups
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
+    // Create UV buffer if texcoords are available
+    bool has_valid_uvs = (texcoords.count > 0);
+    // Check if any face actually references texture coordinates
+    if (has_valid_uvs) {
+        for (int i = 0; i < face_vt.count && has_valid_uvs; i++) {
+            if (face_vt.data[i] <= 0) {
+                has_valid_uvs = false;  // At least one face has no UV
+            }
+        }
+    }
+
+    if (has_valid_uvs) {
+        // Build UV buffer (2 floats per vertex: u, v)
+        float* uv_data = (float*)malloc(num_face_verts * 2 * sizeof(float));
+        if (uv_data) {
+            for (int i = 0; i < num_face_verts; i++) {
+                int vti = face_vt.data[i] - 1;  // OBJ indices are 1-based
+                if (vti >= 0 && vti * 2 + 1 < texcoords.count) {
+                    uv_data[i * 2 + 0] = texcoords.data[vti * 2 + 0];
+                    uv_data[i * 2 + 1] = texcoords.data[vti * 2 + 1];
+                } else {
+                    uv_data[i * 2 + 0] = 0.0f;
+                    uv_data[i * 2 + 1] = 0.0f;
+                }
+            }
+
+            glGenBuffers(1, &mesh->uv_vbo);
+            glBindBuffer(GL_ARRAY_BUFFER, mesh->uv_vbo);
+            glBufferData(GL_ARRAY_BUFFER, num_face_verts * 2 * sizeof(float), uv_data, GL_STATIC_DRAW);
+
+            // UV attribute (location 2)
+            glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+            glEnableVertexAttribArray(2);
+
+            free(uv_data);
+            mesh->has_uvs = true;
+        }
+    }
+
     glBindVertexArray(0);
 
     mesh->vertex_count = num_face_verts;
@@ -320,7 +361,8 @@ bool obj_load_groups(LoadedMesh* mesh, const char* filepath, const char** groups
     int_array_free(&face_vt);
     int_array_free(&face_vn);
 
-    printf("Loaded OBJ: %s (%d vertices)\n", filepath, mesh->vertex_count);
+    printf("Loaded OBJ: %s (%d vertices%s)\n", filepath, mesh->vertex_count,
+           mesh->has_uvs ? ", with UVs" : "");
     return true;
 }
 
@@ -332,8 +374,13 @@ void obj_destroy(LoadedMesh* mesh) {
     if (mesh->valid) {
         glDeleteVertexArrays(1, &mesh->vao);
         glDeleteBuffers(1, &mesh->vbo);
+        if (mesh->uv_vbo) {
+            glDeleteBuffers(1, &mesh->uv_vbo);
+            mesh->uv_vbo = 0;
+        }
         mesh->vao = 0;
         mesh->vbo = 0;
+        mesh->has_uvs = false;
         mesh->vertex_count = 0;
         mesh->valid = false;
     }

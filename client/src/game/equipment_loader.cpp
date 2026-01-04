@@ -117,6 +117,9 @@ static bool load_chassis(const char* filepath) {
             // Model path (relative to assets)
             json_get_string(item, "model", c->model, 128, "");
 
+            // Texture path (relative to assets) - optional default texture
+            json_get_string(item, "texture", c->texture, 128, "");
+
             // Wheel mount positions
             c->wheel_mount_count = 0;
             cJSON* mounts = cJSON_GetObjectItem(item, "wheel_mounts");

@@ -126,6 +126,9 @@ typedef struct {
     int version;                // Config format version (1 = legacy, 2 = flexible)
     char name[MAX_NAME_LENGTH];
 
+    // Rendering (texture can override chassis default)
+    char texture[128];          // Texture path (relative to assets) - empty means use chassis default
+
     // Chassis (shared between v1 and v2)
     float chassis_mass;
     float chassis_length;

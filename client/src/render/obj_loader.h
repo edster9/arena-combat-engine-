@@ -8,10 +8,12 @@
 // A loaded mesh with GPU buffers ready for rendering
 typedef struct LoadedMesh {
     GLuint vao;
-    GLuint vbo;
+    GLuint vbo;            // Position + normal data
+    GLuint uv_vbo;         // UV coordinates (separate buffer)
     int vertex_count;      // Number of vertices to draw
     Vec3 bounds_min;       // Bounding box min
     Vec3 bounds_max;       // Bounding box max
+    bool has_uvs;          // True if mesh has UV coordinates
     bool valid;
 } LoadedMesh;
 

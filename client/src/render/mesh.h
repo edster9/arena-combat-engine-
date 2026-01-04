@@ -16,15 +16,26 @@ typedef struct BoxMesh {
 
 // Box mesh renderer (shared shader for all boxes and loaded meshes)
 typedef struct BoxRenderer {
-    Shader shader;
+    Shader shader;           // Color-based shader
+    Shader textured_shader;  // Texture-based shader
     BoxMesh unit_box;  // 1x1x1 box centered at origin
     bool valid;
-    // Cached uniform locations (avoid glGetUniformLocation every frame)
+    // Cached uniform locations for color shader
     GLint u_model;
     GLint u_view;
     GLint u_projection;
     GLint u_lightDir;
     GLint u_objectColor;
+    // Cached uniform locations for textured shader
+    GLint ut_model;
+    GLint ut_view;
+    GLint ut_projection;
+    GLint ut_lightDir;
+    GLint ut_texture;
+    // Cached frame data (set in begin, used by textured draw)
+    Mat4 cached_view;
+    Mat4 cached_projection;
+    Vec3 cached_light_dir;
 } BoxRenderer;
 
 // Initialize the box renderer
@@ -59,6 +70,12 @@ void box_renderer_draw_mesh_matrix(BoxRenderer* r, GLuint vao, int vertex_count,
 void box_renderer_draw_mesh_rotated(BoxRenderer* r, GLuint vao, int vertex_count,
                                     Vec3 pos, float scale, const float* rot_matrix,
                                     Vec3 pre_translate, Vec3 color);
+
+// Draw a textured mesh with full 3x3 rotation matrix (row-major)
+// Uses the textured shader instead of color shader
+void box_renderer_draw_mesh_textured(BoxRenderer* r, GLuint vao, int vertex_count,
+                                     Vec3 pos, float scale, const float* rot_matrix,
+                                     Vec3 pre_translate, GLuint texture);
 
 // End rendering (resets OpenGL state)
 void box_renderer_end(BoxRenderer* r);

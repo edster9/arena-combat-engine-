@@ -548,6 +548,9 @@ bool config_load_vehicle(const char* filepath, VehicleJSON* out) {
 
     json_get_string(root, "name", out->name, MAX_NAME_LENGTH, "default");
 
+    // Texture - can be overridden at vehicle level
+    json_get_string(root, "texture", out->texture, 128, "");
+
     // Chassis - can be string ID or object with body reference
     const ChassisEquipment* chassis_equip = NULL;
     cJSON* chassis = cJSON_GetObjectItem(root, "chassis");
@@ -604,6 +607,15 @@ bool config_load_vehicle(const char* filepath, VehicleJSON* out) {
         out->physics.chassis_length = out->chassis_length;
         out->physics.chassis_width = out->chassis_width;
         out->physics.chassis_height = out->chassis_height;
+    }
+
+    // Apply texture fallback: if vehicle doesn't specify texture, use chassis default
+    if (out->texture[0] == '\0' && chassis_equip && chassis_equip->texture[0] != '\0') {
+        strncpy(out->texture, chassis_equip->texture, 127);
+        out->texture[127] = '\0';
+    }
+    if (out->texture[0] != '\0') {
+        printf("  Texture: %s\n", out->texture);
     }
 
     // Parse defaults block

@@ -68,6 +68,7 @@ set(SOURCES
     src/render/floor.cpp
     src/render/mesh.cpp
     src/render/obj_loader.cpp
+    src/render/texture.cpp
     src/render/line_render.cpp
     src/game/entity.cpp
     src/game/config_loader.cpp

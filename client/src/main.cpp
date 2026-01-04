@@ -23,6 +23,7 @@
 #include "render/floor.h"
 #include "render/mesh.h"
 #include "render/obj_loader.h"
+#include "render/texture.h"
 #include "game/entity.h"
 #include "render/line_render.h"
 #include "ui/ui_render.h"
@@ -58,15 +59,227 @@
 
 // Vehicle mesh components (loaded separately for proper wheel positioning)
 typedef struct {
+    char type_name[64];    // Vehicle type name (e.g., "sports_car", "pickup_truck")
+    char chassis_id[64];   // Chassis ID (e.g., "compact", "pickup")
     LoadedMesh body;       // Body + spoiler (no wheels)
     LoadedMesh wheel;      // Single wheel mesh (reused for all 4)
     Vec3 wheel_center;     // Center of wheel mesh (for positioning)
     float body_scale;      // Scale for body mesh
     float wheel_scale;     // Scale for wheel mesh
+    GLuint texture;        // Body texture (0 = no texture, use color)
     bool loaded;           // True if meshes loaded successfully
 } VehicleMesh;
 
-static VehicleMesh g_vehicle_mesh = {0};
+// Support multiple vehicle types
+#define MAX_VEHICLE_TYPES 8
+static VehicleMesh g_vehicle_meshes[MAX_VEHICLE_TYPES];
+static VehicleJSON g_vehicle_configs[MAX_VEHICLE_TYPES];
+static int g_vehicle_type_count = 0;
+
+// Map physics vehicle ID to vehicle type index
+static int g_vehicle_type_map[MAX_PHYSICS_VEHICLES] = {0};
+
+// Legacy compatibility: point to first vehicle mesh
+static VehicleMesh* g_vehicle_mesh = &g_vehicle_meshes[0];
+
+// Find vehicle type index by name, returns -1 if not found
+static int find_vehicle_type(const char* type_name) {
+    for (int i = 0; i < g_vehicle_type_count; i++) {
+        if (strcmp(g_vehicle_meshes[i].type_name, type_name) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// Helper to read chassis ID from vehicle JSON file
+static bool read_chassis_id_from_json(const char* filepath, char* chassis_id_out, int max_len) {
+    FILE* f = fopen(filepath, "rb");
+    if (!f) return false;
+
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    char* data = (char*)malloc(size + 1);
+    fread(data, 1, size, f);
+    data[size] = '\0';
+    fclose(f);
+
+    // Simple parse for chassis field
+    const char* chassis_start = strstr(data, "\"chassis\"");
+    if (chassis_start) {
+        // Find the value after the colon
+        const char* colon = strchr(chassis_start, ':');
+        if (colon) {
+            // Skip whitespace
+            const char* value = colon + 1;
+            while (*value && (*value == ' ' || *value == '\t' || *value == '\n')) value++;
+            // If it's a string (direct ID)
+            if (*value == '"') {
+                value++;
+                const char* end = strchr(value, '"');
+                if (end) {
+                    int len = (int)(end - value);
+                    if (len >= max_len) len = max_len - 1;
+                    strncpy(chassis_id_out, value, len);
+                    chassis_id_out[len] = '\0';
+                    free(data);
+                    return true;
+                }
+            }
+        }
+    }
+    free(data);
+    return false;
+}
+
+// Load a vehicle type (config + mesh), returns type index or -1 on failure
+static int load_vehicle_type(const char* type_name) {
+    // Check if already loaded
+    int existing = find_vehicle_type(type_name);
+    if (existing >= 0) return existing;
+
+    // Check capacity
+    if (g_vehicle_type_count >= MAX_VEHICLE_TYPES) {
+        fprintf(stderr, "Too many vehicle types (max %d)\n", MAX_VEHICLE_TYPES);
+        return -1;
+    }
+
+    int idx = g_vehicle_type_count;
+    VehicleMesh* mesh = &g_vehicle_meshes[idx];
+    VehicleJSON* config = &g_vehicle_configs[idx];
+
+    // Initialize mesh struct
+    memset(mesh, 0, sizeof(VehicleMesh));
+
+    // Build vehicle config path
+    char config_path[256];
+    snprintf(config_path, sizeof(config_path), "../../assets/data/vehicles/%s.json", type_name);
+
+    // Read chassis ID from JSON first (before full config load)
+    char chassis_id[64] = {0};
+    if (!read_chassis_id_from_json(config_path, chassis_id, sizeof(chassis_id))) {
+        fprintf(stderr, "Could not find chassis in: %s\n", config_path);
+        return -1;
+    }
+
+    // Store chassis ID
+    strncpy(mesh->chassis_id, chassis_id, sizeof(mesh->chassis_id) - 1);
+
+    // Load vehicle config
+    if (!config_load_vehicle(config_path, config)) {
+        fprintf(stderr, "Failed to load vehicle config: %s\n", config_path);
+        return -1;
+    }
+
+    // Store type name
+    strncpy(mesh->type_name, type_name, sizeof(mesh->type_name) - 1);
+    mesh->type_name[sizeof(mesh->type_name) - 1] = '\0';
+
+    // Get chassis equipment to find model path
+    const ChassisEquipment* chassis = equipment_find_chassis(chassis_id);
+    if (!chassis) {
+        fprintf(stderr, "Chassis '%s' not found for vehicle '%s'\n", chassis_id, type_name);
+        return -1;
+    }
+
+    // Build model paths
+    char body_path[256];
+    char wheel_path[256];
+    snprintf(body_path, sizeof(body_path), "../../assets/%s", chassis->model);
+    // Use standard wheel for now (could be per-tire later)
+    snprintf(wheel_path, sizeof(wheel_path), "../../assets/models/wheels/wheel_standard.obj");
+
+    printf("Loading vehicle type '%s':\n", type_name);
+    printf("  Config: %s\n", config_path);
+    printf("  Body:   %s\n", body_path);
+    printf("  Wheel:  %s\n", wheel_path);
+
+    // Load meshes
+    bool body_loaded = obj_load(&mesh->body, body_path);
+    bool wheel_loaded = obj_load(&mesh->wheel, wheel_path);
+
+    if (body_loaded && wheel_loaded) {
+        // Calculate body scale
+        Vec3 body_size = obj_get_size(&mesh->body);
+        float body_length = fmaxf(body_size.x, body_size.z);
+        mesh->body_scale = (body_length > 0.001f) ? (CAR_LENGTH / body_length) : 1.0f;
+
+        // Calculate wheel scale
+        Vec3 wheel_size = obj_get_size(&mesh->wheel);
+        float wheel_radius_model = fmaxf(wheel_size.x, wheel_size.y) * 0.5f;
+        mesh->wheel_scale = 0.32f / wheel_radius_model;
+
+        // Store wheel center
+        mesh->wheel_center = obj_get_center(&mesh->wheel);
+        mesh->loaded = true;
+
+        // Update config dimensions from mesh if not set
+        float scale = mesh->body_scale;
+        float mesh_length = body_size.z * scale;
+        float mesh_width = body_size.x * scale;
+        float mesh_height = body_size.y * scale;
+
+        if (config->chassis_length <= 0.01f) {
+            config->chassis_length = mesh_length;
+            config->physics.chassis_length = mesh_length;
+        }
+        if (config->chassis_width <= 0.01f) {
+            config->chassis_width = mesh_width;
+            config->physics.chassis_width = mesh_width;
+        }
+        if (config->chassis_height <= 0.01f) {
+            config->chassis_height = mesh_height;
+            config->physics.chassis_height = mesh_height;
+        }
+
+        printf("  Body:  %.2f x %.2f x %.2f, scale: %.2f\n",
+               body_size.x, body_size.y, body_size.z, mesh->body_scale);
+        printf("  Wheel: %.2f x %.2f x %.2f, scale: %.2f\n",
+               wheel_size.x, wheel_size.y, wheel_size.z, mesh->wheel_scale);
+        printf("  Physics dims: %.2fm x %.2fm x %.2fm\n",
+               config->chassis_length, config->chassis_width, config->chassis_height);
+
+        // Load texture if specified and mesh has UVs
+        mesh->texture = 0;
+        if (config->texture[0] != '\0' && mesh->body.has_uvs) {
+            char texture_path[256];
+            snprintf(texture_path, sizeof(texture_path), "../../assets/%s", config->texture);
+            mesh->texture = texture_load(texture_path);
+            if (mesh->texture) {
+                printf("  Texture: %s (loaded)\n", config->texture);
+            } else {
+                printf("  Texture: %s (failed to load)\n", config->texture);
+            }
+        } else if (config->texture[0] != '\0' && !mesh->body.has_uvs) {
+            printf("  Texture: %s (mesh has no UVs, skipping)\n", config->texture);
+        }
+    } else {
+        if (!body_loaded) printf("  Warning: Could not load body mesh\n");
+        if (!wheel_loaded) printf("  Warning: Could not load wheel mesh\n");
+        mesh->loaded = false;
+    }
+
+    g_vehicle_type_count++;
+    return idx;
+}
+
+// Get mesh for a physics vehicle
+static VehicleMesh* get_vehicle_mesh(int physics_id) {
+    if (physics_id < 0 || physics_id >= MAX_PHYSICS_VEHICLES) return g_vehicle_mesh;
+    int type_idx = g_vehicle_type_map[physics_id];
+    if (type_idx < 0 || type_idx >= g_vehicle_type_count) return g_vehicle_mesh;
+    return &g_vehicle_meshes[type_idx];
+}
+
+// Get config for a physics vehicle
+static VehicleJSON* get_vehicle_config(int physics_id) {
+    if (physics_id < 0 || physics_id >= MAX_PHYSICS_VEHICLES) return &g_vehicle_configs[0];
+    int type_idx = g_vehicle_type_map[physics_id];
+    if (type_idx < 0 || type_idx >= g_vehicle_type_count) return &g_vehicle_configs[0];
+    return &g_vehicle_configs[type_idx];
+}
 
 // Game mode is determined by physics pause state:
 // - physics.paused = true  → Turn Based mode (planning turns)
@@ -317,16 +530,27 @@ static void draw_physics_vehicles(BoxRenderer* r, PhysicsWorld* pw, int selected
         // Get vehicle config for dimensions
         VehicleConfig* cfg = &pw->vehicles[i].config;
 
+        // Get the correct mesh for this vehicle type
+        VehicleMesh* vmesh = get_vehicle_mesh(i);
+
         // Draw chassis - use loaded mesh if available, otherwise box
-        if (g_vehicle_mesh.loaded) {
+        if (vmesh->loaded) {
             // Use full rotation matrix for proper roll/pitch during flips
             // Pre-translate to offset mesh center to match physics center
-            Vec3 body_center = obj_get_center(&g_vehicle_mesh.body);
+            Vec3 body_center = obj_get_center(&vmesh->body);
             Vec3 pre_translate = vec3(-body_center.x, -body_center.y, -body_center.z);
 
-            box_renderer_draw_mesh_rotated(r, g_vehicle_mesh.body.vao, g_vehicle_mesh.body.vertex_count,
-                                           pos, g_vehicle_mesh.body_scale, rot_matrix,
-                                           pre_translate, color);
+            if (vmesh->texture && vmesh->body.has_uvs) {
+                // Use textured rendering
+                box_renderer_draw_mesh_textured(r, vmesh->body.vao, vmesh->body.vertex_count,
+                                                pos, vmesh->body_scale, rot_matrix,
+                                                pre_translate, vmesh->texture);
+            } else {
+                // Fallback to color-based rendering
+                box_renderer_draw_mesh_rotated(r, vmesh->body.vao, vmesh->body.vertex_count,
+                                               pos, vmesh->body_scale, rot_matrix,
+                                               pre_translate, color);
+            }
             // Wheels rendered separately by draw_vehicle_wheels_mesh()
         } else {
             Vec3 chassis_size = vec3(cfg->chassis_width, cfg->chassis_height, cfg->chassis_length);
@@ -452,18 +676,19 @@ static void draw_vehicle_wheels(LineRenderer* lr, PhysicsWorld* pw) {
 // Draw wheels using loaded mesh at physics wheel positions
 // Uses Jolt wheel transform for correct display during rollovers
 static void draw_vehicle_wheels_mesh(BoxRenderer* r, PhysicsWorld* pw) {
-    if (!g_vehicle_mesh.loaded) return;
-
     Vec3 wheel_color = vec3(0.2f, 0.2f, 0.22f);  // Dark tire color
-
-    // Pre-translation to center the wheel mesh at origin
-    // (wheel mesh may not be centered - offset it so rotation is around hub)
-    Vec3 center_offset = vec3(-g_vehicle_mesh.wheel_center.x,
-                              -g_vehicle_mesh.wheel_center.y,
-                              -g_vehicle_mesh.wheel_center.z);
 
     for (int i = 0; i < pw->vehicle_count; i++) {
         if (!pw->vehicles[i].active) continue;
+
+        // Get the correct mesh for this vehicle type
+        VehicleMesh* vmesh = get_vehicle_mesh(i);
+        if (!vmesh->loaded) continue;
+
+        // Pre-translation to center the wheel mesh at origin
+        Vec3 center_offset = vec3(-vmesh->wheel_center.x,
+                                  -vmesh->wheel_center.y,
+                                  -vmesh->wheel_center.z);
 
         VehicleConfig* cfg = &pw->vehicles[i].config;
         WheelState wheels[4];
@@ -474,7 +699,7 @@ static void draw_vehicle_wheels_mesh(BoxRenderer* r, PhysicsWorld* pw) {
             float radius = cfg->use_per_wheel_config ? cfg->wheel_radii[w] : cfg->wheel_radius;
 
             // Scale wheel mesh to match physics wheel radius
-            float wheel_scale = g_vehicle_mesh.wheel_scale * (radius / 0.32f);
+            float wheel_scale = vmesh->wheel_scale * (radius / 0.32f);
             Vec3 scale = vec3(wheel_scale, wheel_scale, wheel_scale);
 
             // Wheel rotation matrix from physics (column-major)
@@ -496,8 +721,8 @@ static void draw_vehicle_wheels_mesh(BoxRenderer* r, PhysicsWorld* pw) {
                 rot[6], rot[7], rot[8]                         // Z unchanged
             };
 
-            box_renderer_draw_mesh_matrix(r, g_vehicle_mesh.wheel.vao,
-                                          g_vehicle_mesh.wheel.vertex_count,
+            box_renderer_draw_mesh_matrix(r, vmesh->wheel.vao,
+                                          vmesh->wheel.vertex_count,
                                           center, scale, corrected_rot,
                                           center_offset, wheel_color);
         }
@@ -562,112 +787,46 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // Load car model components (body and wheel separately)
-    // Body: extracted chassis mesh (body + spoiler combined)
-    // Wheel: single wheel mesh, centered at origin, reused for all 4 wheels
-    const char* body_path = "../../assets/models/chassis/compact_body.obj";
-    const char* wheel_path = "../../assets/models/wheels/wheel_standard.obj";
-
-    bool body_loaded = obj_load(&g_vehicle_mesh.body, body_path);
-    bool wheel_loaded = obj_load(&g_vehicle_mesh.wheel, wheel_path);
-
-    if (body_loaded && wheel_loaded) {
-        // Calculate body scale based on body dimensions (without wheels)
-        Vec3 body_size = obj_get_size(&g_vehicle_mesh.body);
-        float body_length = fmaxf(body_size.x, body_size.z);  // Longest horizontal axis
-        if (body_length > 0.001f) {
-            g_vehicle_mesh.body_scale = CAR_LENGTH / body_length;
-        } else {
-            g_vehicle_mesh.body_scale = 1.0f;
-        }
-
-        // Wheel scale: match physics wheel radius
-        // Kenney wheel is about 0.2 units radius, physics wheel is ~0.32
-        Vec3 wheel_size = obj_get_size(&g_vehicle_mesh.wheel);
-        float wheel_radius_model = fmaxf(wheel_size.x, wheel_size.y) * 0.5f;
-        g_vehicle_mesh.wheel_scale = 0.32f / wheel_radius_model;  // Scale to physics radius
-
-        // Store wheel center for proper positioning
-        g_vehicle_mesh.wheel_center = obj_get_center(&g_vehicle_mesh.wheel);
-
-        g_vehicle_mesh.loaded = true;
-        printf("Loaded vehicle model:\n");
-        printf("  Body: %.2f x %.2f x %.2f, scale: %.2f\n",
-               body_size.x, body_size.y, body_size.z, g_vehicle_mesh.body_scale);
-        printf("  Wheel: %.2f x %.2f x %.2f, scale: %.2f\n",
-               wheel_size.x, wheel_size.y, wheel_size.z, g_vehicle_mesh.wheel_scale);
-    } else {
-        if (!body_loaded) printf("Warning: Could not load car body mesh\n");
-        if (!wheel_loaded) printf("Warning: Could not load wheel mesh\n");
-        printf("Falling back to box rendering\n");
-    }
-
-    // Load equipment data (required for vehicle config parsing)
+    // Load equipment data first (required for vehicle config parsing)
     if (!equipment_load_all("../../assets/data/equipment")) {
         fprintf(stderr, "Warning: Equipment data not loaded - using defaults\n");
     }
 
-    // Load JSON configs - these are required for correct physics
+    // Load scene config
     SceneJSON scene_config;
-    VehicleJSON vehicle_config;
     bool scene_ok = config_load_scene("../../assets/config/scenes/showdown.json", &scene_config);
-    bool vehicle_ok = config_load_vehicle("../../assets/data/vehicles/sports_car.json", &vehicle_config);
-
     if (!scene_ok) {
         fprintf(stderr, "\n*** ERROR: Scene config failed to load! ***\n");
         fprintf(stderr, "*** Check assets/config/scenes/showdown.json ***\n\n");
     }
+
+    // Load all vehicle types from scene
+    bool vehicle_ok = false;
+    if (scene_ok) {
+        printf("\n=== Loading Vehicle Types ===\n");
+        for (int i = 0; i < scene_config.vehicle_count; i++) {
+            const char* type_name = scene_config.vehicles[i].type;
+            int type_idx = load_vehicle_type(type_name);
+            if (type_idx >= 0) {
+                vehicle_ok = true;  // At least one vehicle loaded
+            }
+        }
+        printf("=== Loaded %d vehicle type(s) ===\n\n", g_vehicle_type_count);
+    }
+
     if (!vehicle_ok) {
-        fprintf(stderr, "\n*** ERROR: Vehicle config failed to load! ***\n");
-        fprintf(stderr, "*** Arena will be empty - no vehicles! ***\n");
-        fprintf(stderr, "*** Check assets/data/vehicles/sports_car.json ***\n\n");
+        fprintf(stderr, "\n*** ERROR: No vehicle configs loaded! ***\n");
+        fprintf(stderr, "*** Arena will be empty - no vehicles! ***\n\n");
     }
 
-    // Override chassis dimensions from mesh bounds if not set in JSON
-    // This allows dimensions to be derived from the OBJ model automatically
-    if (vehicle_ok && g_vehicle_mesh.loaded) {
-        Vec3 body_size = obj_get_size(&g_vehicle_mesh.body);
-        Vec3 body_center = obj_get_center(&g_vehicle_mesh.body);
-        float scale = g_vehicle_mesh.body_scale;
-
-        // OBJ model orientation: Z is length (front-to-back), X is width (side-to-side)
-        // This matches the Kenney car models where car faces along +Z
-        float mesh_length = body_size.z * scale;
-        float mesh_width = body_size.x * scale;
-        float mesh_height = body_size.y * scale;
-
-        printf("  OBJ bounds: size=[%.2f, %.2f, %.2f] center=[%.2f, %.2f, %.2f] (unscaled)\n",
-               body_size.x, body_size.y, body_size.z,
-               body_center.x, body_center.y, body_center.z);
-        printf("  OBJ bounds min=[%.2f, %.2f, %.2f] max=[%.2f, %.2f, %.2f]\n",
-               g_vehicle_mesh.body.bounds_min.x, g_vehicle_mesh.body.bounds_min.y, g_vehicle_mesh.body.bounds_min.z,
-               g_vehicle_mesh.body.bounds_max.x, g_vehicle_mesh.body.bounds_max.y, g_vehicle_mesh.body.bounds_max.z);
-
-        // If JSON didn't specify dimensions (0), use mesh bounds
-        if (vehicle_config.chassis_length <= 0.01f) {
-            vehicle_config.chassis_length = mesh_length;
-            vehicle_config.physics.chassis_length = mesh_length;
-        }
-        if (vehicle_config.chassis_width <= 0.01f) {
-            vehicle_config.chassis_width = mesh_width;
-            vehicle_config.physics.chassis_width = mesh_width;
-        }
-        if (vehicle_config.chassis_height <= 0.01f) {
-            vehicle_config.chassis_height = mesh_height;
-            vehicle_config.physics.chassis_height = mesh_height;
-        }
-
-        printf("  Physics dims: %.2fm x %.2fm x %.2fm (from %s)\n",
-               vehicle_config.chassis_length, vehicle_config.chassis_width,
-               vehicle_config.chassis_height,
-               (mesh_length > 0.01f) ? "mesh" : "JSON");
-    }
+    // For legacy compatibility, point to first vehicle config
+    VehicleJSON& vehicle_config = g_vehicle_configs[0];
 
     // Initialize entity manager and create vehicles from scene (only if scene loaded)
     EntityManager entities;
     entity_manager_init(&entities);
     if (scene_ok && vehicle_ok) {
-        float entity_scale = g_vehicle_mesh.loaded ? g_vehicle_mesh.body_scale : 1.0f;
+        float entity_scale = g_vehicle_mesh->loaded ? g_vehicle_mesh->body_scale : 1.0f;
         create_vehicles_from_scene(&entities, &scene_config, entity_scale);
     }
 
@@ -709,23 +868,36 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    // Create physics vehicles for each entity using vehicle config
-    // Only if vehicle config loaded successfully
+    // Create physics vehicles for each entity using per-vehicle type configs
+    // Only if vehicle configs loaded successfully
     int entity_to_physics[MAX_ENTITIES];  // Maps entity id -> physics vehicle id
     memset(entity_to_physics, -1, sizeof(entity_to_physics));
 
     if (vehicle_ok) {
-        VehicleConfig vehicle_cfg = config_vehicle_to_physics(&vehicle_config);
+        int scene_vehicle_idx = 0;  // Track which scene vehicle we're creating
         for (int i = 0; i < entities.count; i++) {
             Entity* e = &entities.entities[i];
             if (e->active && e->type == ENTITY_VEHICLE) {
+                // Get vehicle type from scene config
+                const char* type_name = scene_config.vehicles[scene_vehicle_idx].type;
+                int type_idx = find_vehicle_type(type_name);
+                if (type_idx < 0) type_idx = 0;  // Fallback to first type
+
+                VehicleJSON* vconfig = &g_vehicle_configs[type_idx];
+                VehicleConfig vehicle_cfg = config_vehicle_to_physics(vconfig);
+
                 int phys_id = physics_create_vehicle(&physics, e->position, e->rotation_y, &vehicle_cfg);
                 entity_to_physics[e->id] = phys_id;
 
+                // Map physics ID to vehicle type for rendering
+                g_vehicle_type_map[phys_id] = type_idx;
+
+                printf("Created vehicle %d: type='%s' (type_idx=%d)\n", phys_id, type_name, type_idx);
+
                 // Attach scripts to this vehicle (each vehicle gets its own isolated script instance)
                 if (script_engine) {
-                    for (int si = 0; si < vehicle_config.script_count; si++) {
-                        VehicleScript* vs = &vehicle_config.scripts[si];
+                    for (int si = 0; si < vconfig->script_count; si++) {
+                        VehicleScript* vs = &vconfig->scripts[si];
                         if (!vs->enabled) continue;
 
                         // Build config arrays
@@ -741,6 +913,8 @@ int main(int argc, char* argv[]) {
                                              keys, values, vs->option_count);
                     }
                 }
+
+                scene_vehicle_idx++;
             }
         }
     }
@@ -1014,68 +1188,80 @@ int main(int argc, char* argv[]) {
             // Reload equipment first (suspension.json, tires.json, etc.)
             equipment_load_all("../../assets/data/equipment");
 
-            // Try to reload vehicle config (will use reloaded equipment data)
-            VehicleJSON new_vehicle_config;
-            if (config_load_vehicle("../../assets/data/vehicles/sports_car.json", &new_vehicle_config)) {
-                vehicle_config = new_vehicle_config;
+            // Collect old spawn info and vehicle types before destroying
+            int old_count = physics.vehicle_count;
+            Vec3 spawn_positions[MAX_PHYSICS_VEHICLES];
+            float spawn_rotations[MAX_PHYSICS_VEHICLES];
+            int old_type_map[MAX_PHYSICS_VEHICLES];
+            for (int i = 0; i < old_count; i++) {
+                spawn_positions[i] = physics.vehicles[i].spawn_position;
+                spawn_rotations[i] = physics.vehicles[i].spawn_rotation;
+                old_type_map[i] = g_vehicle_type_map[i];
+            }
 
-                // Override chassis dimensions from mesh bounds (same as startup)
-                if (g_vehicle_mesh.loaded) {
-                    Vec3 body_size = obj_get_size(&g_vehicle_mesh.body);
-                    float scale = g_vehicle_mesh.body_scale;
-                    float mesh_length = body_size.z * scale;
-                    float mesh_width = body_size.x * scale;
-                    float mesh_height = body_size.y * scale;
+            // Reload all vehicle type configs (but don't reload meshes - they're already in GPU)
+            bool reload_ok = true;
+            for (int t = 0; t < g_vehicle_type_count; t++) {
+                VehicleMesh* mesh = &g_vehicle_meshes[t];
+                VehicleJSON* config = &g_vehicle_configs[t];
 
-                    if (vehicle_config.chassis_length <= 0.01f) {
-                        vehicle_config.chassis_length = mesh_length;
-                        vehicle_config.physics.chassis_length = mesh_length;
+                char config_path[256];
+                snprintf(config_path, sizeof(config_path), "../../assets/data/vehicles/%s.json", mesh->type_name);
+
+                VehicleJSON new_config;
+                if (config_load_vehicle(config_path, &new_config)) {
+                    *config = new_config;
+
+                    // Override chassis dimensions from mesh bounds
+                    if (mesh->loaded) {
+                        Vec3 body_size = obj_get_size(&mesh->body);
+                        float scale = mesh->body_scale;
+                        if (config->chassis_length <= 0.01f) {
+                            config->chassis_length = body_size.z * scale;
+                            config->physics.chassis_length = config->chassis_length;
+                        }
+                        if (config->chassis_width <= 0.01f) {
+                            config->chassis_width = body_size.x * scale;
+                            config->physics.chassis_width = config->chassis_width;
+                        }
+                        if (config->chassis_height <= 0.01f) {
+                            config->chassis_height = body_size.y * scale;
+                            config->physics.chassis_height = config->chassis_height;
+                        }
                     }
-                    if (vehicle_config.chassis_width <= 0.01f) {
-                        vehicle_config.chassis_width = mesh_width;
-                        vehicle_config.physics.chassis_width = mesh_width;
-                    }
-                    if (vehicle_config.chassis_height <= 0.01f) {
-                        vehicle_config.chassis_height = mesh_height;
-                        vehicle_config.physics.chassis_height = mesh_height;
-                    }
+                    printf("Reloaded config: %s\n", mesh->type_name);
+                } else {
+                    fprintf(stderr, "Failed to reload: %s\n", mesh->type_name);
+                    reload_ok = false;
                 }
+            }
 
-                VehicleConfig vehicle_cfg = config_vehicle_to_physics(&vehicle_config);
-
-                // Destroy and recreate all physics vehicles with new config
-                // (respawn only moves bodies - joints have fixed anchors set at creation)
-                // First, collect all spawn positions
-                int old_count = physics.vehicle_count;
-                Vec3 spawn_positions[MAX_PHYSICS_VEHICLES];
-                float spawn_rotations[MAX_PHYSICS_VEHICLES];
-                for (int i = 0; i < old_count; i++) {
-                    spawn_positions[i] = physics.vehicles[i].spawn_position;
-                    spawn_rotations[i] = physics.vehicles[i].spawn_rotation;
-                }
-
+            if (reload_ok) {
                 // Destroy all vehicles
                 for (int i = 0; i < old_count; i++) {
                     if (physics.vehicles[i].active) {
                         physics_destroy_vehicle(&physics, i);
                     }
                 }
-
-                // Reset vehicle count so IDs are reused
                 physics.vehicle_count = 0;
 
-                // Recreate all vehicles with new config
+                // Recreate all vehicles with their correct type configs
                 for (int i = 0; i < old_count; i++) {
-                    physics_create_vehicle(&physics, spawn_positions[i], spawn_rotations[i], &vehicle_cfg);
-                }
-                printf("Vehicle config reloaded, all vehicles recreated\n");
+                    int type_idx = old_type_map[i];
+                    VehicleJSON* vconfig = &g_vehicle_configs[type_idx];
+                    VehicleConfig vehicle_cfg = config_vehicle_to_physics(vconfig);
 
-                // Unpause physics so vehicles can settle (they spawn at Y=0, need physics to push up)
+                    int phys_id = physics_create_vehicle(&physics, spawn_positions[i], spawn_rotations[i], &vehicle_cfg);
+                    g_vehicle_type_map[phys_id] = type_idx;
+                }
+                printf("All %d vehicles recreated with reloaded configs\n", old_count);
+
+                // Unpause physics so vehicles can settle
                 if (physics_is_paused(&physics)) {
                     physics_unpause(&physics);
                 }
             } else {
-                fprintf(stderr, "RELOAD FAILED: Vehicle config has errors - keeping current vehicles\n");
+                fprintf(stderr, "RELOAD FAILED: Some configs have errors - keeping current vehicles\n");
             }
         }
 
@@ -1678,8 +1864,8 @@ int main(int argc, char* argv[]) {
             // Render physics vehicles as solid primitives (physics-first approach)
             draw_physics_vehicles(&box_renderer, &physics, selected_phys_id, team_for_vehicle);
 
-            // Draw wheel meshes at physics wheel positions (if mesh loaded)
-            if (g_vehicle_mesh.loaded) {
+            // Draw wheel meshes at physics wheel positions (if any mesh loaded)
+            if (g_vehicle_type_count > 0) {
                 draw_vehicle_wheels_mesh(&box_renderer, &physics);
             }
         }
@@ -1689,8 +1875,8 @@ int main(int argc, char* argv[]) {
         if (has_lines) {
             line_renderer_begin(&line_renderer, &view, &projection);
 
-            // Draw wheels with rotating spokes (only if mesh not loaded - fallback)
-            if (show_cars && !g_vehicle_mesh.loaded) {
+            // Draw wheels with rotating spokes (only if no meshes loaded - fallback)
+            if (show_cars && g_vehicle_type_count == 0) {
                 draw_vehicle_wheels(&line_renderer, &physics);
             }
 
@@ -2351,8 +2537,14 @@ int main(int argc, char* argv[]) {
     if (has_lines) line_renderer_destroy(&line_renderer);
     if (has_text) text_renderer_destroy(&text_renderer);
     ui_renderer_destroy(&ui_renderer);
-    obj_destroy(&g_vehicle_mesh.body);
-    obj_destroy(&g_vehicle_mesh.wheel);
+    // Destroy all vehicle meshes and textures
+    for (int t = 0; t < g_vehicle_type_count; t++) {
+        obj_destroy(&g_vehicle_meshes[t].body);
+        obj_destroy(&g_vehicle_meshes[t].wheel);
+        if (g_vehicle_meshes[t].texture) {
+            texture_destroy(g_vehicle_meshes[t].texture);
+        }
+    }
     box_renderer_destroy(&box_renderer);
     floor_destroy(&arena_floor);
     platform_shutdown(&platform);

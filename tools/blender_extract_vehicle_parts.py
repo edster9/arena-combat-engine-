@@ -111,12 +111,12 @@ def select_objects(objects):
 
 
 def export_selected_obj(filepath):
-    """Export selected objects to OBJ file."""
+    """Export selected objects to OBJ file with UVs for texturing."""
     bpy.ops.wm.obj_export(
         filepath=filepath,
         export_selected_objects=True,
-        export_materials=False,
-        export_uv=False,
+        export_materials=True,
+        export_uv=True,
         export_normals=True,
         export_triangulated_mesh=True,
         forward_axis='NEGATIVE_Z',
